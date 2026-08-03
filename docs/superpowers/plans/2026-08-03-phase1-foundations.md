@@ -327,47 +327,50 @@ create policy "Users can update their own profile"
 
 Create `supabase/tests/database/users_rls.sql`:
 
+This test simulates authenticated requests using Supabase's built-in `authenticated` role and the `request.jwt.claim.sub` setting that `auth.uid()` reads from — no external test-helper package required.
+
 ```sql
 begin;
 select plan(4);
 
-select tests.create_supabase_user('alice');
-select tests.create_supabase_user('bob');
+insert into auth.users (id, email) values
+  ('11111111-1111-1111-1111-111111111111', 'alice@example.com'),
+  ('22222222-2222-2222-2222-222222222222', 'bob@example.com');
 
--- Alice can insert her own profile
-select tests.authenticate_as('alice');
+-- Simulate Alice's authenticated request
+set local role authenticated;
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
 insert into public.users (id, name)
-values (tests.get_supabase_uid('alice'), 'Alice');
+values ('11111111-1111-1111-1111-111111111111', 'Alice');
+
 select is(
-  (select name from public.users where id = tests.get_supabase_uid('alice')),
+  (select name from public.users where id = '11111111-1111-1111-1111-111111111111'),
   'Alice',
   'Alice can insert and read her own profile'
 );
 
--- Bob cannot read Alice's profile
-select tests.authenticate_as('bob');
+-- Simulate Bob's authenticated request
+set local request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
 select is(
-  (select count(*)::int from public.users where id = tests.get_supabase_uid('alice')),
+  (select count(*)::int from public.users where id = '11111111-1111-1111-1111-111111111111'),
   0,
   'Bob cannot see Alice''s profile'
 );
 
--- Bob cannot insert a profile row for Alice's id
 select throws_ok(
-  format(
-    'insert into public.users (id, name) values (%L, ''Fake Alice'')',
-    tests.get_supabase_uid('alice')
-  ),
+  $$insert into public.users (id, name) values ('11111111-1111-1111-1111-111111111111', 'Fake Alice')$$,
   '42501',
   null,
   'Bob cannot insert a profile for another user''s id'
 );
 
--- Bob can insert and read his own profile
 insert into public.users (id, name)
-values (tests.get_supabase_uid('bob'), 'Bob');
+values ('22222222-2222-2222-2222-222222222222', 'Bob');
+
 select is(
-  (select name from public.users where id = tests.get_supabase_uid('bob')),
+  (select name from public.users where id = '22222222-2222-2222-2222-222222222222'),
   'Bob',
   'Bob can insert and read his own profile'
 );
