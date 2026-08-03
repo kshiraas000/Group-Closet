@@ -19,6 +19,8 @@
 - Row-Level Security is the real privacy boundary, enforced at the database, not just app code (spec §2)
 - No formal TDD process for the SwiftUI/UI layer — manual/exploratory QA instead; RLS policy tests at the database level are required and get real automated coverage (spec §6)
 - Bundle identifier: `com.aashna.closet` (assumption — change in Xcode's Signing & Capabilities tab if you want a different one; every step below assumes this exact value)
+- **Never manually edit `Closet.xcodeproj`/`project.pbxproj` contents.** The project uses Xcode 16+'s synchronized folder groups, so `.swift` files created, edited, or deleted on disk under `Closet/` are automatically reflected in Xcode — no project-file changes needed for ordinary code work. The few things that genuinely require Xcode's GUI (creating the project, adding SPM packages, enabling capabilities, code signing, deployment target, asset catalogs/app icons) are called out as explicit manual steps in the tasks below; everything else is plain file edits, done in VS Code.
+- Primary editor is VS Code (via Claude Code) for all Swift code, git, and docs. Xcode is used only for: running the app / SwiftUI Previews, the GUI-only steps above, and later TestFlight builds and App Store assets.
 
 ---
 
