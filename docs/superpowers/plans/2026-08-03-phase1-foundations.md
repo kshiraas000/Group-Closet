@@ -309,6 +309,8 @@ git commit -m "Add initial database schema"
 Create `supabase/migrations/20260803000001_users_rls.sql`:
 
 ```sql
+grant select, insert, update on public.users to authenticated;
+
 create policy "Users can view their own profile"
   on public.users for select
   using (auth.uid() = id);
