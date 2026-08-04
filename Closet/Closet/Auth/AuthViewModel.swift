@@ -13,7 +13,8 @@ final class AuthViewModel {
     }
 
     func loadSession() async {
-        session = try? await client.auth.session
+        let localSession = try? await client.auth.session
+        session = (localSession?.isExpired == false) ? localSession : nil
         isLoading = false
     }
 
