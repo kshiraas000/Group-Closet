@@ -9,9 +9,17 @@ import SwiftUI
 
 @main
 struct ClosetApp: App {
+    @State private var authViewModel = AuthViewModel()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if authViewModel.isLoading {
+                ProgressView()
+            } else if authViewModel.session == nil {
+                SignInView(authViewModel: authViewModel)
+            } else {
+                Text("Signed in") // replaced by RootView in Task 7
+            }
         }
     }
 }

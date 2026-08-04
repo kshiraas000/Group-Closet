@@ -386,9 +386,9 @@ git commit -m "Add RLS policies and tests for users table"
 
 In Xcode: select `Closet` target → Signing & Capabilities → "+" Capability → Sign in with Apple. Requires a paid Apple Developer account signed into Xcode (Xcode → Settings → Accounts).
 
-- [ ] **Step 2: Configure Sign in with Apple in the Supabase dashboard**
+- [ ] **Step 2: Register the app with the Supabase dashboard**
 
-In your Apple Developer account, create a Services ID and a Sign in with Apple key (Certificates, Identifiers & Profiles → Identifiers / Keys). In the Supabase dashboard → Authentication → Providers → Apple, enable it and fill in your Services ID, Team ID, Key ID, and the private key content.
+Native-only Sign in with Apple (what this app uses) does not need a Services ID, secret key, or redirect URI — those are only for the web OAuth flow. In the Supabase dashboard → Authentication → Providers → Apple: enable it, and add `com.aashna.Closet` to the **Client IDs** field. That's the only required field.
 
 - [ ] **Step 3: Write the profile model**
 
