@@ -78,7 +78,7 @@ Expected: `** BUILD SUCCEEDED **`
 - Modify: `Closet/Closet.xcodeproj` (add SPM dependency), `Closet/Closet/Info.plist` (via Xcode's Info tab)
 
 **Interfaces:**
-- Produces: `SupabaseService.shared.client` — a configured `SupabaseClient`, used by every later task that talks to the backend
+- Produces: `SupabaseService.shared` — a configured `SupabaseClient`, used by every later task that talks to the backend
 
 - [ ] **Step 1: Install the Supabase CLI**
 
@@ -379,18 +379,18 @@ git commit -m "Add RLS policies and tests for users table"
 - Modify: `Closet/Closet.xcodeproj` (capability), `Closet/Closet/ClosetApp.swift`
 
 **Interfaces:**
-- Consumes: `SupabaseService.shared.client` (Task 2)
+- Consumes: `SupabaseService.shared` (Task 2)
 - Produces: `AuthViewModel` with `@Observable var session: Session?`, `func signInWithApple(idToken: String, nonce: String) async throws`, `func signOut() async throws` — every later phase's auth-gated screen reads `authViewModel.session`
 
-- [ ] **Step 1: Enable the Sign in with Apple capability**
+- [x] **Step 1: Enable the Sign in with Apple capability**
 
 In Xcode: select `Closet` target → Signing & Capabilities → "+" Capability → Sign in with Apple. Requires a paid Apple Developer account signed into Xcode (Xcode → Settings → Accounts).
 
-- [ ] **Step 2: Register the app with the Supabase dashboard**
+- [x] **Step 2: Register the app with the Supabase dashboard**
 
 Native-only Sign in with Apple (what this app uses) does not need a Services ID, secret key, or redirect URI — those are only for the web OAuth flow. In the Supabase dashboard → Authentication → Providers → Apple: enable it, and add `com.aashna.Closet` to the **Client IDs** field. That's the only required field.
 
-- [ ] **Step 3: Write the profile model**
+- [x] **Step 3: Write the profile model**
 
 Create `Closet/Closet/Models/UserProfile.swift`:
 
@@ -411,7 +411,7 @@ struct UserProfile: Codable, Identifiable {
 }
 ```
 
-- [ ] **Step 4: Write the auth view model**
+- [x] **Step 4: Write the auth view model**
 
 Create `Closet/Closet/Auth/AuthViewModel.swift`:
 
@@ -424,7 +424,7 @@ final class AuthViewModel {
     var session: Session?
     var isLoading = true
 
-    private let client = SupabaseService.shared.client
+    private let client = SupabaseService.shared
 
     init() {
         Task { await loadSession() }
@@ -448,7 +448,7 @@ final class AuthViewModel {
 }
 ```
 
-- [ ] **Step 5: Write the sign-in screen**
+- [x] **Step 5: Write the sign-in screen**
 
 Create `Closet/Closet/Auth/SignInView.swift`:
 
@@ -534,7 +534,7 @@ struct SignInView: View {
 }
 ```
 
-- [ ] **Step 6: Wire it into the app entry point**
+- [x] **Step 6: Wire it into the app entry point**
 
 Modify `Closet/Closet/ClosetApp.swift`:
 
@@ -559,16 +559,16 @@ struct ClosetApp: App {
 }
 ```
 
-- [ ] **Step 7: Verify it builds**
+- [x] **Step 7: Verify it builds**
 
 Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
-- [ ] **Step 8: Manually verify on a device**
+- [x] **Step 8: Manually verify on a device**
 
 Sign in with Apple does not work in the iOS Simulator with a real Apple ID in every Xcode version reliably — run on a physical device (Xcode → select your device → Run). Tap "Sign in with Apple", complete the system prompt, confirm the app shows "Signed in". Check Supabase dashboard → Authentication → Users — a new user should appear.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add Closet/Closet/Models/UserProfile.swift Closet/Closet/Auth Closet/Closet/ClosetApp.swift Closet/Closet.xcodeproj
@@ -583,10 +583,10 @@ git commit -m "Add Sign in with Apple"
 - Create: `Closet/Closet/Onboarding/OnboardingViewModel.swift`, `Closet/Closet/Onboarding/OnboardingView.swift`
 
 **Interfaces:**
-- Consumes: `AuthViewModel.session` (Task 5), `UserProfile` (Task 5), `SupabaseService.shared.client` (Task 2)
+- Consumes: `AuthViewModel.session` (Task 5), `UserProfile` (Task 5), `SupabaseService.shared` (Task 2)
 - Produces: `OnboardingViewModel` with `func save() async throws`, writes a row into `public.users`; `RootView` (Task 7) uses profile existence to decide whether to show onboarding
 
-- [ ] **Step 1: Write the onboarding view model**
+- [x] **Step 1: Write the onboarding view model**
 
 Create `Closet/Closet/Onboarding/OnboardingViewModel.swift`:
 
@@ -602,7 +602,7 @@ final class OnboardingViewModel {
     var isSaving = false
     var errorMessage: String?
 
-    private let client = SupabaseService.shared.client
+    private let client = SupabaseService.shared
 
     func save(userID: UUID) async -> Bool {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -630,7 +630,7 @@ final class OnboardingViewModel {
 }
 ```
 
-- [ ] **Step 2: Write the onboarding view**
+- [x] **Step 2: Write the onboarding view**
 
 Create `Closet/Closet/Onboarding/OnboardingView.swift`:
 
@@ -668,12 +668,12 @@ struct OnboardingView: View {
 }
 ```
 
-- [ ] **Step 3: Verify it builds**
+- [x] **Step 3: Verify it builds**
 
 Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Closet/Closet/Onboarding
@@ -692,7 +692,7 @@ git commit -m "Add onboarding profile creation flow"
 - Consumes: `AuthViewModel` (Task 5), `OnboardingView` (Task 6)
 - Produces: `RootView`, the single top-level view the app renders — later phases replace `MainTabView`'s stub tab content, not its routing
 
-- [ ] **Step 1: Write the placeholder tab view**
+- [x] **Step 1: Write the placeholder tab view**
 
 Create `Closet/Closet/MainTabView.swift`:
 
@@ -713,7 +713,7 @@ struct MainTabView: View {
 }
 ```
 
-- [ ] **Step 2: Write the root view**
+- [x] **Step 2: Write the root view**
 
 Create `Closet/Closet/RootView.swift`:
 
@@ -747,7 +747,7 @@ struct RootView: View {
             hasProfile = false
             return
         }
-        let count = (try? await SupabaseService.shared.client
+        let count = (try? await SupabaseService.shared
             .from("users")
             .select("id", head: true, count: .exact)
             .eq("id", value: userID)
@@ -758,7 +758,7 @@ struct RootView: View {
 }
 ```
 
-- [ ] **Step 3: Wire `RootView` into the app entry point**
+- [x] **Step 3: Wire `RootView` into the app entry point**
 
 Modify `Closet/Closet/ClosetApp.swift`:
 
@@ -777,16 +777,16 @@ struct ClosetApp: App {
 }
 ```
 
-- [ ] **Step 4: Verify it builds**
+- [x] **Step 4: Verify it builds**
 
 Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
-- [ ] **Step 5: Manually verify the full flow on a device**
+- [x] **Step 5: Manually verify the full flow on a device**
 
 Run on a physical device. Confirm: signed-out → Sign in with Apple screen. First sign-in → onboarding form. Submit form → three placeholder tabs appear. Force-quit and relaunch → goes straight to the tabs (session + profile both persisted).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Closet/Closet/RootView.swift Closet/Closet/MainTabView.swift Closet/Closet/ClosetApp.swift
