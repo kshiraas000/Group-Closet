@@ -18,25 +18,27 @@
 - Sign in with Apple is the only auth method — no email/password (spec §3, §4)
 - Row-Level Security is the real privacy boundary, enforced at the database, not just app code (spec §2)
 - No formal TDD process for the SwiftUI/UI layer — manual/exploratory QA instead; RLS policy tests at the database level are required and get real automated coverage (spec §6)
-- Bundle identifier: `com.aashna.closet` (assumption — change in Xcode's Signing & Capabilities tab if you want a different one; every step below assumes this exact value)
-- **Never manually edit `Closet.xcodeproj`/`project.pbxproj` contents.** The project uses Xcode 16+'s synchronized folder groups, so `.swift` files created, edited, or deleted on disk under `Closet/` are automatically reflected in Xcode — no project-file changes needed for ordinary code work. The few things that genuinely require Xcode's GUI (creating the project, adding SPM packages, enabling capabilities, code signing, deployment target, asset catalogs/app icons) are called out as explicit manual steps in the tasks below; everything else is plain file edits, done in VS Code.
+- Bundle identifier: `com.aashna.Closet` (actual value from the created Xcode project — capital C; every step below assumes this exact value)
+- Project layout: Xcode nested the project one level deeper than originally planned — `Closet/Closet.xcodeproj` and `Closet/Closet/*.swift`, not flat at repo root. This is normal Xcode behavior (it always creates a `<ProductName>/` subfolder at the chosen save location) and every path below reflects it.
+- **Never manually edit `Closet/Closet.xcodeproj`/`project.pbxproj` contents.** The project uses Xcode 16+'s synchronized folder groups, so `.swift` files created, edited, or deleted on disk under `Closet/Closet/` are automatically reflected in Xcode — no project-file changes needed for ordinary code work. The few things that genuinely require Xcode's GUI (creating the project, adding SPM packages, enabling capabilities, code signing, deployment target, asset catalogs/app icons) are called out as explicit manual steps in the tasks below; everything else is plain file edits, done in VS Code.
+- **Deployment target still needs a manual fix:** the project was created with the default (26.5, the current Xcode SDK version) instead of iOS 17.0. Fix in Xcode: select the `Closet` project → target `Closet` → General → Minimum Deployments → iOS 17.0. Not something to hand-edit in `project.pbxproj`.
 - Primary editor is VS Code (via Claude Code) for all Swift code, git, and docs. Xcode is used only for: running the app / SwiftUI Previews, the GUI-only steps above, and later TestFlight builds and App Store assets.
 
 ---
 
 ## File Structure
 
-**iOS app** (`Closet/` inside the repo root, alongside the existing `.xcodeproj`):
-- `Closet/ClosetApp.swift` — app entry point, holds the shared `AuthViewModel`, shows `RootView`
-- `Closet/RootView.swift` — routes to `SignInView`, `OnboardingView`, or `MainTabView` based on `AuthViewModel.state`
-- `Closet/MainTabView.swift` — placeholder `TabView` (Closets / My Clothes / Profile), each tab a stub `Text` view for now
-- `Closet/Supabase/SupabaseService.swift` — shared `SupabaseClient` singleton, reads URL/key from Info.plist
-- `Closet/Models/UserProfile.swift` — `Codable` struct matching the `users` table
-- `Closet/Auth/AuthViewModel.swift` — `@Observable`; owns session state, Sign in with Apple flow, sign out
-- `Closet/Auth/SignInView.swift` — Sign in with Apple button screen
-- `Closet/Onboarding/OnboardingViewModel.swift` — `@Observable`; profile form state, upsert to `users`
-- `Closet/Onboarding/OnboardingView.swift` — name / photo / sizes form
-- `Closet/Config.xcconfig` — **gitignored**; holds `SUPABASE_URL` / `SUPABASE_ANON_KEY` for your own Supabase project
+**iOS app** (`Closet/Closet/` inside the repo root; `Closet/Closet.xcodeproj` is its sibling, both inside the top-level `Closet/` folder Xcode created):
+- `Closet/Closet/ClosetApp.swift` — app entry point, holds the shared `AuthViewModel`, shows `RootView`
+- `Closet/Closet/RootView.swift` — routes to `SignInView`, `OnboardingView`, or `MainTabView` based on `AuthViewModel.state`
+- `Closet/Closet/MainTabView.swift` — placeholder `TabView` (Closets / My Clothes / Profile), each tab a stub `Text` view for now
+- `Closet/Closet/Supabase/SupabaseService.swift` — shared `SupabaseClient` singleton, reads URL/key from Info.plist
+- `Closet/Closet/Models/UserProfile.swift` — `Codable` struct matching the `users` table
+- `Closet/Closet/Auth/AuthViewModel.swift` — `@Observable`; owns session state, Sign in with Apple flow, sign out
+- `Closet/Closet/Auth/SignInView.swift` — Sign in with Apple button screen
+- `Closet/Closet/Onboarding/OnboardingViewModel.swift` — `@Observable`; profile form state, upsert to `users`
+- `Closet/Closet/Onboarding/OnboardingView.swift` — name / photo / sizes form
+- `Closet/Closet/Config.xcconfig` — **gitignored**; holds `SUPABASE_URL` / `SUPABASE_ANON_KEY` for your own Supabase project
 
 **Supabase backend** (`supabase/` at repo root, managed by the Supabase CLI):
 - `supabase/config.toml` — generated by `supabase init`
@@ -49,59 +51,31 @@
 ### Task 1: Xcode Project Scaffold
 
 **Files:**
-- Create: `Closet.xcodeproj`, `Closet/ClosetApp.swift`, `Closet/ContentView.swift` (Xcode's default template files)
+- Create: `Closet/Closet.xcodeproj`, `Closet/Closet/ClosetApp.swift`, `Closet/Closet/ContentView.swift` (Xcode's default template files)
 
 **Interfaces:**
 - Produces: an Xcode project named `Closet`, scheme `Closet`, buildable via `xcodebuild`
 
-- [ ] **Step 1: Create the project in Xcode**
+- [x] **Step 1: Create the project in Xcode** — done. Product Name `Closet`, Organization Identifier `com.aashna` (bundle ID came out `com.aashna.Closet`, capital C — see Global Constraints), SwiftUI, Swift, no Core Data, no test target. Saved inside the repo, which is why the project ended up nested as `Closet/Closet.xcodeproj` (see Global Constraints) rather than flat at repo root as originally planned.
 
-Open Xcode → File → New → Project → iOS → App. Fill in:
-- Product Name: `Closet`
-- Organization Identifier: `com.aashna` (bundle ID becomes `com.aashna.closet`)
-- Interface: SwiftUI
-- Language: Swift
-- Storage: None (uncheck "Use Core Data")
-- Uncheck "Include Tests" — no automated UI-layer tests per Global Constraints; a test target is added in a later phase if pure-Swift logic needs one
-
-Save it at the repo root: `/Users/aashnak/Library/CloudStorage/OneDrive-GeorgiaInstituteofTechnology/Personal Projects/Group-Closet`
-
-- [ ] **Step 2: Set the deployment target**
-
-In the project navigator, select the `Closet` project → target `Closet` → General tab → Minimum Deployments → set to **iOS 17.0**.
+- [ ] **Step 2: Set the deployment target** — **still pending.** The project was created with the default deployment target (26.5) instead of iOS 17.0. In Xcode: select the `Closet` project → target `Closet` → General tab → Minimum Deployments → set to **iOS 17.0**.
 
 - [ ] **Step 3: Verify it builds from the command line**
 
-Run: `xcodebuild -project Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
+Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
-- [ ] **Step 4: Add a `.gitignore`**
+- [x] **Step 4: Add a `.gitignore`** — done (repo root `.gitignore`, covers `xcuserdata/`, `*.xcuserstate`, `DerivedData/`, `Closet/Closet/Config.xcconfig`, `.supabase/`). Two xcuserdata files that had already been committed before the `.gitignore` existed were untracked with `git rm --cached`.
 
-Create `.gitignore` at repo root:
-
-```
-.DS_Store
-xcuserdata/
-*.xcuserstate
-DerivedData/
-Closet/Config.xcconfig
-.supabase/
-```
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add Closet.xcodeproj Closet/ClosetApp.swift Closet/ContentView.swift Closet/Assets.xcassets Closet/Preview\ Content .gitignore
-git commit -m "Scaffold Xcode project"
-```
+- [x] **Step 5: Commit** — done (folded into other commits made while reconciling this task with what Xcode actually produced, rather than as a standalone "Scaffold Xcode project" commit).
 
 ---
 
 ### Task 2: Supabase Project + CLI + Swift SDK
 
 **Files:**
-- Create: `supabase/config.toml` (via CLI), `Closet/Config.xcconfig`, `Closet/Supabase/SupabaseService.swift`
-- Modify: `Closet.xcodeproj` (add SPM dependency), `Closet/Info.plist` (via Xcode's Info tab)
+- Create: `supabase/config.toml` (via CLI), `Closet/Closet/Config.xcconfig`, `Closet/Closet/Supabase/SupabaseService.swift`
+- Modify: `Closet/Closet.xcodeproj` (add SPM dependency), `Closet/Closet/Info.plist` (via Xcode's Info tab)
 
 **Interfaces:**
 - Produces: `SupabaseService.shared.client` — a configured `SupabaseClient`, used by every later task that talks to the backend
@@ -134,7 +108,7 @@ In Xcode: File → Add Package Dependencies → URL `https://github.com/supabase
 
 - [ ] **Step 6: Add the xcconfig for your own project's credentials**
 
-Create `Closet/Config.xcconfig` (this file is gitignored — never commit real credentials):
+Create `Closet/Closet/Config.xcconfig` (this file is gitignored — never commit real credentials):
 
 ```
 SUPABASE_URL = https://xxxxx.supabase.co
@@ -143,13 +117,13 @@ SUPABASE_ANON_KEY = your-anon-key-here
 
 Replace both values with what you copied in Step 3. In Xcode: select the `Closet` project → Info tab → under Configurations, set both Debug and Release to use `Config.xcconfig`.
 
-Add two entries to `Closet/Info.plist` (Xcode's Info tab, "+" button):
+Add two entries to `Closet/Closet/Info.plist` (Xcode's Info tab, "+" button):
 - Key `SUPABASE_URL`, Type String, Value `$(SUPABASE_URL)`
 - Key `SUPABASE_ANON_KEY`, Type String, Value `$(SUPABASE_ANON_KEY)`
 
 - [ ] **Step 7: Write the client singleton**
 
-Create `Closet/Supabase/SupabaseService.swift`:
+Create `Closet/Closet/Supabase/SupabaseService.swift`:
 
 ```swift
 import Foundation
@@ -163,7 +137,7 @@ enum SupabaseService {
 
     private static func infoPlistValue(for key: String) -> String {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String, !value.isEmpty else {
-            fatalError("Missing \(key) in Info.plist — check Closet/Config.xcconfig")
+            fatalError("Missing \(key) in Info.plist — check Closet/Closet/Config.xcconfig")
         }
         return value
     }
@@ -172,13 +146,13 @@ enum SupabaseService {
 
 - [ ] **Step 8: Verify it builds**
 
-Run: `xcodebuild -project Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
+Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add supabase/config.toml Closet.xcodeproj Closet/Supabase/SupabaseService.swift Closet/Info.plist
+git add supabase/config.toml Closet/Closet.xcodeproj Closet/Closet/Supabase/SupabaseService.swift Closet/Closet/Info.plist
 git commit -m "Add Supabase project, CLI link, and Swift client"
 ```
 
@@ -401,8 +375,8 @@ git commit -m "Add RLS policies and tests for users table"
 ### Task 5: Sign in with Apple
 
 **Files:**
-- Create: `Closet/Models/UserProfile.swift`, `Closet/Auth/AuthViewModel.swift`, `Closet/Auth/SignInView.swift`
-- Modify: `Closet.xcodeproj` (capability), `Closet/ClosetApp.swift`
+- Create: `Closet/Closet/Models/UserProfile.swift`, `Closet/Closet/Auth/AuthViewModel.swift`, `Closet/Closet/Auth/SignInView.swift`
+- Modify: `Closet/Closet.xcodeproj` (capability), `Closet/Closet/ClosetApp.swift`
 
 **Interfaces:**
 - Consumes: `SupabaseService.shared.client` (Task 2)
@@ -418,7 +392,7 @@ In your Apple Developer account, create a Services ID and a Sign in with Apple k
 
 - [ ] **Step 3: Write the profile model**
 
-Create `Closet/Models/UserProfile.swift`:
+Create `Closet/Closet/Models/UserProfile.swift`:
 
 ```swift
 import Foundation
@@ -439,7 +413,7 @@ struct UserProfile: Codable, Identifiable {
 
 - [ ] **Step 4: Write the auth view model**
 
-Create `Closet/Auth/AuthViewModel.swift`:
+Create `Closet/Closet/Auth/AuthViewModel.swift`:
 
 ```swift
 import Foundation
@@ -476,7 +450,7 @@ final class AuthViewModel {
 
 - [ ] **Step 5: Write the sign-in screen**
 
-Create `Closet/Auth/SignInView.swift`:
+Create `Closet/Closet/Auth/SignInView.swift`:
 
 ```swift
 import SwiftUI
@@ -562,7 +536,7 @@ struct SignInView: View {
 
 - [ ] **Step 6: Wire it into the app entry point**
 
-Modify `Closet/ClosetApp.swift`:
+Modify `Closet/Closet/ClosetApp.swift`:
 
 ```swift
 import SwiftUI
@@ -587,7 +561,7 @@ struct ClosetApp: App {
 
 - [ ] **Step 7: Verify it builds**
 
-Run: `xcodebuild -project Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
+Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
 - [ ] **Step 8: Manually verify on a device**
@@ -597,7 +571,7 @@ Sign in with Apple does not work in the iOS Simulator with a real Apple ID in ev
 - [ ] **Step 9: Commit**
 
 ```bash
-git add Closet/Models/UserProfile.swift Closet/Auth Closet/ClosetApp.swift Closet.xcodeproj
+git add Closet/Closet/Models/UserProfile.swift Closet/Closet/Auth Closet/Closet/ClosetApp.swift Closet/Closet.xcodeproj
 git commit -m "Add Sign in with Apple"
 ```
 
@@ -606,7 +580,7 @@ git commit -m "Add Sign in with Apple"
 ### Task 6: Onboarding — Profile Creation
 
 **Files:**
-- Create: `Closet/Onboarding/OnboardingViewModel.swift`, `Closet/Onboarding/OnboardingView.swift`
+- Create: `Closet/Closet/Onboarding/OnboardingViewModel.swift`, `Closet/Closet/Onboarding/OnboardingView.swift`
 
 **Interfaces:**
 - Consumes: `AuthViewModel.session` (Task 5), `UserProfile` (Task 5), `SupabaseService.shared.client` (Task 2)
@@ -614,7 +588,7 @@ git commit -m "Add Sign in with Apple"
 
 - [ ] **Step 1: Write the onboarding view model**
 
-Create `Closet/Onboarding/OnboardingViewModel.swift`:
+Create `Closet/Closet/Onboarding/OnboardingViewModel.swift`:
 
 ```swift
 import Foundation
@@ -658,7 +632,7 @@ final class OnboardingViewModel {
 
 - [ ] **Step 2: Write the onboarding view**
 
-Create `Closet/Onboarding/OnboardingView.swift`:
+Create `Closet/Closet/Onboarding/OnboardingView.swift`:
 
 ```swift
 import SwiftUI
@@ -696,13 +670,13 @@ struct OnboardingView: View {
 
 - [ ] **Step 3: Verify it builds**
 
-Run: `xcodebuild -project Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
+Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Closet/Onboarding
+git add Closet/Closet/Onboarding
 git commit -m "Add onboarding profile creation flow"
 ```
 
@@ -711,8 +685,8 @@ git commit -m "Add onboarding profile creation flow"
 ### Task 7: Root Routing + Placeholder Tabs
 
 **Files:**
-- Create: `Closet/RootView.swift`, `Closet/MainTabView.swift`
-- Modify: `Closet/ClosetApp.swift`
+- Create: `Closet/Closet/RootView.swift`, `Closet/Closet/MainTabView.swift`
+- Modify: `Closet/Closet/ClosetApp.swift`
 
 **Interfaces:**
 - Consumes: `AuthViewModel` (Task 5), `OnboardingView` (Task 6)
@@ -720,7 +694,7 @@ git commit -m "Add onboarding profile creation flow"
 
 - [ ] **Step 1: Write the placeholder tab view**
 
-Create `Closet/MainTabView.swift`:
+Create `Closet/Closet/MainTabView.swift`:
 
 ```swift
 import SwiftUI
@@ -741,7 +715,7 @@ struct MainTabView: View {
 
 - [ ] **Step 2: Write the root view**
 
-Create `Closet/RootView.swift`:
+Create `Closet/Closet/RootView.swift`:
 
 ```swift
 import SwiftUI
@@ -786,7 +760,7 @@ struct RootView: View {
 
 - [ ] **Step 3: Wire `RootView` into the app entry point**
 
-Modify `Closet/ClosetApp.swift`:
+Modify `Closet/Closet/ClosetApp.swift`:
 
 ```swift
 import SwiftUI
@@ -805,7 +779,7 @@ struct ClosetApp: App {
 
 - [ ] **Step 4: Verify it builds**
 
-Run: `xcodebuild -project Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
+Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
 - [ ] **Step 5: Manually verify the full flow on a device**
@@ -815,7 +789,7 @@ Run on a physical device. Confirm: signed-out → Sign in with Apple screen. Fir
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Closet/RootView.swift Closet/MainTabView.swift Closet/ClosetApp.swift
+git add Closet/Closet/RootView.swift Closet/Closet/MainTabView.swift Closet/Closet/ClosetApp.swift
 git commit -m "Add root routing and placeholder tab view"
 ```
 
