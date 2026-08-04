@@ -13,13 +13,7 @@ struct ClosetApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if authViewModel.isLoading {
-                ProgressView()
-            } else if authViewModel.session == nil {
-                SignInView(authViewModel: authViewModel)
-            } else {
-                Text("Signed in") // replaced by RootView in Task 7
-            }
+            RootView(authViewModel: authViewModel)
         }
     }
 }
