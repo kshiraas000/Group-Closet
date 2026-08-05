@@ -37,6 +37,7 @@ struct RootView: View {
             hasProfile = count > 0
         } catch {
             try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
             await checkProfile(userID: userID)
         }
     }

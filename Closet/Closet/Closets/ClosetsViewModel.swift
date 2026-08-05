@@ -11,6 +11,7 @@ final class ClosetsViewModel {
     private let client = SupabaseService.shared
 
     func loadClosets() async {
+        errorMessage = nil
         isLoading = true
         defer { isLoading = false }
         do {

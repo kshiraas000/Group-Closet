@@ -4,7 +4,7 @@ struct Closet: Codable, Identifiable {
     let id: UUID
     var name: String
     let inviteCode: String
-    let createdBy: UUID
+    let createdBy: UUID?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {

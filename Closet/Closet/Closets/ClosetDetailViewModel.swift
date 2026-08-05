@@ -15,6 +15,7 @@ final class ClosetDetailViewModel {
     private let client = SupabaseService.shared
 
     func loadMembers(closetID: UUID) async {
+        errorMessage = nil
         isLoading = true
         defer { isLoading = false }
         do {
@@ -31,6 +32,7 @@ final class ClosetDetailViewModel {
     }
 
     func leave(closetID: UUID, userID: UUID) async -> Bool {
+        errorMessage = nil
         do {
             try await client
                 .from("closet_members")
