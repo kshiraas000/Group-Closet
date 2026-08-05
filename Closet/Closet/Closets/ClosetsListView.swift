@@ -11,12 +11,16 @@ struct ClosetsListView: View {
             Group {
                 if viewModel.isLoading {
                     ProgressView()
+                } else if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage).foregroundStyle(.red)
                 } else if viewModel.closets.isEmpty {
                     emptyState
                 } else {
                     List(viewModel.closets) { closet in
                         NavigationLink(closet.name) {
-                            ClosetDetailView(closet: closet, userID: userID)
+                            ClosetDetailView(closet: closet, userID: userID) {
+                                Task { await viewModel.loadClosets() }
+                            }
                         }
                     }
                 }
