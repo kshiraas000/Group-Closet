@@ -6,9 +6,14 @@ private struct MemberRow: Decodable {
     let users: UserProfile
 }
 
+private struct ItemShareRow: Decodable {
+    let items: Item
+}
+
 @Observable
 final class ClosetDetailViewModel {
     var members: [UserProfile] = []
+    var items: [Item] = []
     var isLoading = true
     var errorMessage: String?
 
@@ -26,6 +31,20 @@ final class ClosetDetailViewModel {
                 .execute()
                 .value
             members = rows.map(\.users)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadItems(closetID: UUID) async {
+        do {
+            let rows: [ItemShareRow] = try await client
+                .from("item_shares")
+                .select("items(*)")
+                .eq("closet_id", value: closetID)
+                .execute()
+                .value
+            items = rows.map(\.items)
         } catch {
             errorMessage = error.localizedDescription
         }

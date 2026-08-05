@@ -3,6 +3,7 @@ import SwiftUI
 struct ClosetDetailView: View {
     @State private var viewModel = ClosetDetailViewModel()
     @State private var showingLeaveConfirmation = false
+    @State private var showingAddItem = false
     @Environment(\.dismiss) private var dismiss
     let closet: Closet
     let userID: UUID
@@ -16,6 +17,20 @@ struct ClosetDetailView: View {
                 } else {
                     ForEach(viewModel.members) { member in
                         Text(member.name)
+                    }
+                }
+            }
+            Section("Items") {
+                if viewModel.items.isEmpty {
+                    Text("No items yet").foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.items) { item in
+                        VStack(alignment: .leading) {
+                            Text(item.category.rawValue)
+                            if let caption = item.caption {
+                                Text(caption).font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
             }
@@ -36,7 +51,24 @@ struct ClosetDetailView: View {
             }
         }
         .navigationTitle(closet.name)
-        .task { await viewModel.loadMembers(closetID: closet.id) }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingAddItem = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .task {
+            await viewModel.loadMembers(closetID: closet.id)
+            await viewModel.loadItems(closetID: closet.id)
+        }
+        .sheet(isPresented: $showingAddItem) {
+            AddItemView(closetID: closet.id, userID: userID) {
+                Task { await viewModel.loadItems(closetID: closet.id) }
+            }
+        }
         .confirmationDialog(
             "Leave \(closet.name)?",
             isPresented: $showingLeaveConfirmation,
