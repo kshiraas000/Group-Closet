@@ -83,7 +83,12 @@ final class AddItemViewModel {
                 draftItems[index].saveState = .failed("Could not process image")
                 return
             }
-            let path = "\(ownerID)/\(itemID)/0.jpg"
+            // Lowercased: Swift's UUID interpolation is uppercase, but Postgres's
+            // uuid::text cast (used by storage.objects' RLS policies) is always
+            // lowercase — an uppercase path segment would never match auth.uid()::text.
+            let ownerSegment = ownerID.uuidString.lowercased()
+            let itemSegment = itemID.uuidString.lowercased()
+            let path = "\(ownerSegment)/\(itemSegment)/0.jpg"
 
             try await client.storage.from("item-photos").upload(
                 path,
@@ -96,29 +101,67 @@ final class AddItemViewModel {
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
 
-            let newItem = NewItem(
-                id: itemID,
-                ownerID: ownerID,
-                category: category,
-                size: draft.size.isEmpty ? nil : draft.size,
-                color: draft.color.isEmpty ? nil : draft.color,
-                occasionTags: occasionTags,
-                caption: draft.caption.isEmpty ? nil : draft.caption
-            )
-            try await client.from("items").insert(newItem).execute()
+            // save() can be re-invoked on the same itemID via the retry button
+            // after a partial prior failure. authenticated only has SELECT+INSERT
+            // on these tables (no UPDATE — edit/delete is a later phase), so
+            // idempotency comes from checking whether each row already exists
+            // before inserting it, not from ON CONFLICT DO UPDATE (which needs
+            // UPDATE privilege Postgres enforces even when nothing would change).
+            if try await !rowExists(table: "items", column: "id", value: itemID) {
+                let newItem = NewItem(
+                    id: itemID,
+                    ownerID: ownerID,
+                    category: category,
+                    size: draft.size.isEmpty ? nil : draft.size,
+                    color: draft.color.isEmpty ? nil : draft.color,
+                    occasionTags: occasionTags,
+                    caption: draft.caption.isEmpty ? nil : draft.caption
+                )
+                try await client.from("items").insert(newItem).execute()
+            }
 
-            let newPhoto = NewItemPhoto(itemID: itemID, photoURL: path, position: 0)
-            try await client.from("item_photos").insert(newPhoto).execute()
+            if try await !rowExists(table: "item_photos", column: "item_id", value: itemID) {
+                let newPhoto = NewItemPhoto(itemID: itemID, photoURL: path, position: 0)
+                try await client.from("item_photos").insert(newPhoto).execute()
+            }
 
             var closetIDs = shareToClosetIDs
             closetIDs.insert(currentClosetID)
-            let shares = closetIDs.map { NewItemShare(itemID: itemID, closetID: $0) }
-            try await client.from("item_shares").insert(shares).execute()
+            let alreadyShared = try await existingShareClosetIDs(itemID: itemID)
+            let missingShares = closetIDs.subtracting(alreadyShared)
+            if !missingShares.isEmpty {
+                let shares = missingShares.map { NewItemShare(itemID: itemID, closetID: $0) }
+                try await client.from("item_shares").insert(shares).execute()
+            }
 
             draftItems[index].saveState = .saved
         } catch {
             draftItems[index].saveState = .failed(error.localizedDescription)
         }
+    }
+
+    private func rowExists(table: String, column: String, value: UUID) async throws -> Bool {
+        let count = try await client
+            .from(table)
+            .select(column, head: true, count: .exact)
+            .eq(column, value: value)
+            .execute()
+            .count ?? 0
+        return count > 0
+    }
+
+    private func existingShareClosetIDs(itemID: UUID) async throws -> Set<UUID> {
+        struct ShareRow: Decodable {
+            let closetID: UUID
+            enum CodingKeys: String, CodingKey { case closetID = "closet_id" }
+        }
+        let rows: [ShareRow] = try await client
+            .from("item_shares")
+            .select("closet_id")
+            .eq("item_id", value: itemID)
+            .execute()
+            .value
+        return Set(rows.map(\.closetID))
     }
 }
 
