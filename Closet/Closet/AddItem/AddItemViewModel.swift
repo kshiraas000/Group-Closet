@@ -1,5 +1,6 @@
 import Foundation
 import PostgREST
+import Storage
 import Supabase
 import UIKit
 
@@ -24,6 +25,7 @@ struct DraftItem: Identifiable {
 @Observable
 final class AddItemViewModel {
     var draftItems: [DraftItem] = []
+    var shareToClosetIDs: Set<UUID> = []
     private var defaultSizes: [String: String] = [:]
 
     private let client = SupabaseService.shared
@@ -58,5 +60,104 @@ final class AddItemViewModel {
         case .shoes: return defaultSizes["shoe"] ?? ""
         case .dress, .outerwear, .accessory: return ""
         }
+    }
+
+    func saveAll(currentClosetID: UUID, ownerID: UUID) async {
+        for index in draftItems.indices {
+            guard draftItems[index].saveState != .saved else { continue }
+            await save(itemAt: index, currentClosetID: currentClosetID, ownerID: ownerID)
+        }
+    }
+
+    func save(itemAt index: Int, currentClosetID: UUID, ownerID: UUID) async {
+        draftItems[index].saveState = .saving
+        let draft = draftItems[index]
+        guard let category = draft.category else {
+            draftItems[index].saveState = .failed("Missing category")
+            return
+        }
+
+        do {
+            let itemID = draft.id
+            guard let imageData = ImageCompressor.compress(draft.image) else {
+                draftItems[index].saveState = .failed("Could not process image")
+                return
+            }
+            let path = "\(ownerID)/\(itemID)/0.jpg"
+
+            try await client.storage.from("item-photos").upload(
+                path,
+                data: imageData,
+                options: FileOptions(contentType: "image/jpeg", upsert: true)
+            )
+
+            let occasionTags = draft.occasionTags
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+
+            let newItem = NewItem(
+                id: itemID,
+                ownerID: ownerID,
+                category: category,
+                size: draft.size.isEmpty ? nil : draft.size,
+                color: draft.color.isEmpty ? nil : draft.color,
+                occasionTags: occasionTags,
+                caption: draft.caption.isEmpty ? nil : draft.caption
+            )
+            try await client.from("items").insert(newItem).execute()
+
+            let newPhoto = NewItemPhoto(itemID: itemID, photoURL: path, position: 0)
+            try await client.from("item_photos").insert(newPhoto).execute()
+
+            var closetIDs = shareToClosetIDs
+            closetIDs.insert(currentClosetID)
+            let shares = closetIDs.map { NewItemShare(itemID: itemID, closetID: $0) }
+            try await client.from("item_shares").insert(shares).execute()
+
+            draftItems[index].saveState = .saved
+        } catch {
+            draftItems[index].saveState = .failed(error.localizedDescription)
+        }
+    }
+}
+
+private struct NewItem: Encodable {
+    let id: UUID
+    let ownerID: UUID
+    let category: ItemCategory
+    let size: String?
+    let color: String?
+    let occasionTags: [String]
+    let caption: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case ownerID = "owner_id"
+        case category, size, color
+        case occasionTags = "occasion_tags"
+        case caption
+    }
+}
+
+private struct NewItemPhoto: Encodable {
+    let itemID: UUID
+    let photoURL: String
+    let position: Int
+
+    enum CodingKeys: String, CodingKey {
+        case itemID = "item_id"
+        case photoURL = "photo_url"
+        case position
+    }
+}
+
+private struct NewItemShare: Encodable {
+    let itemID: UUID
+    let closetID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case itemID = "item_id"
+        case closetID = "closet_id"
     }
 }
