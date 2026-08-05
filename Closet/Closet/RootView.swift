@@ -12,23 +12,21 @@ struct RootView: View {
                 ProgressView()
             } else if authViewModel.session == nil {
                 SignInView(authViewModel: authViewModel)
-            } else if hasProfile == nil {
-                ProgressView().task { await checkProfile() }
-            } else if hasProfile == true {
-                MainTabView()
             } else if let userID = authViewModel.session?.user.id {
-                OnboardingView(userID: userID) {
-                    hasProfile = true
+                if hasProfile == nil {
+                    ProgressView().task { await checkProfile(userID: userID) }
+                } else if hasProfile == true {
+                    MainTabView(userID: userID)
+                } else {
+                    OnboardingView(userID: userID) {
+                        hasProfile = true
+                    }
                 }
             }
         }
     }
 
-    private func checkProfile() async {
-        guard let userID = authViewModel.session?.user.id else {
-            hasProfile = false
-            return
-        }
+    private func checkProfile(userID: UUID) async {
         let count = (try? await SupabaseService.shared
             .from("users")
             .select("id", head: true, count: .exact)

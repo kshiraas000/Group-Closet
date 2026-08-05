@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct MainTabView: View {
+    let userID: UUID
+
     var body: some View {
         TabView {
-            Text("Closets")
+            ClosetsListView(userID: userID)
                 .tabItem { Label("Closets", systemImage: "door.left.hand.open") }
             Text("My Clothes")
                 .tabItem { Label("My Clothes", systemImage: "tshirt") }
