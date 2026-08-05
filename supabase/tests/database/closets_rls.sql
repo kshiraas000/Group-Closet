@@ -1,5 +1,5 @@
 begin;
-select plan(9);
+select plan(12);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'alice@example.com'),
@@ -64,6 +64,30 @@ select is(
   (select name from public.users where id = '11111111-1111-1111-1111-111111111111'),
   'Alice',
   'Bob can now see Alice''s profile (closet-mate visibility)'
+);
+
+select throws_ok(
+  $$insert into public.closet_members (user_id, closet_id) values (auth.uid(), (select id from public.closets limit 1))$$,
+  '42501',
+  null,
+  'Direct insert into closet_members is blocked (must go through create_closet/join_closet_by_invite_code)'
+);
+
+select throws_ok(
+  $$insert into public.closets (name, invite_code, created_by) values ('Fake', 'fakecode', auth.uid())$$,
+  '42501',
+  null,
+  'Direct insert into closets is blocked (must go through create_closet)'
+);
+
+delete from public.closet_members
+where user_id = '11111111-1111-1111-1111-111111111111'
+  and closet_id = (select id from public.closets limit 1);
+
+select is(
+  (select count(*)::int from public.closet_members where user_id = '11111111-1111-1111-1111-111111111111'),
+  1,
+  'Bob cannot delete Alice''s membership (DELETE policy is self-only)'
 );
 
 delete from public.closet_members

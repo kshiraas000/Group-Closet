@@ -1,5 +1,5 @@
 begin;
-select plan(4);
+select plan(5);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'alice@example.com'),
@@ -41,6 +41,16 @@ select is(
   (select name from public.users where id = '22222222-2222-2222-2222-222222222222'),
   'Bob',
   'Bob can insert and read his own profile'
+);
+
+update public.users set name = 'Hacked' where id = '11111111-1111-1111-1111-111111111111';
+
+reset role;
+
+select is(
+  (select name from public.users where id = '11111111-1111-1111-1111-111111111111'),
+  'Alice',
+  'Bob cannot update Alice''s profile (UPDATE policy is self-only)'
 );
 
 select * from finish();
