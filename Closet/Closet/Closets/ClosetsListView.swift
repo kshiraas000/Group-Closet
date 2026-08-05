@@ -28,8 +28,9 @@ struct ClosetsListView: View {
             .navigationTitle("Closets")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingCreate = true
+                    Menu {
+                        Button("Create a Closet") { showingCreate = true }
+                        Button("Join with invite code") { showingJoin = true }
                     } label: {
                         Image(systemName: "plus")
                     }
