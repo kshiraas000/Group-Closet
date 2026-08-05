@@ -29,7 +29,7 @@ final class OnboardingViewModel {
         let profile = UserProfile(id: userID, name: name, photoURL: nil, sizes: sizes)
 
         do {
-            try await client.from("users").insert(profile).execute()
+            try await client.from("users").upsert(profile).execute()
             return true
         } catch {
             errorMessage = error.localizedDescription

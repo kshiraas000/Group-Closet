@@ -27,12 +27,17 @@ struct RootView: View {
     }
 
     private func checkProfile(userID: UUID) async {
-        let count = (try? await SupabaseService.shared
-            .from("users")
-            .select("id", head: true, count: .exact)
-            .eq("id", value: userID)
-            .execute()
-            .count) ?? 0
-        hasProfile = count > 0
+        do {
+            let count = try await SupabaseService.shared
+                .from("users")
+                .select("id", head: true, count: .exact)
+                .eq("id", value: userID)
+                .execute()
+                .count ?? 0
+            hasProfile = count > 0
+        } catch {
+            try? await Task.sleep(for: .seconds(2))
+            await checkProfile(userID: userID)
+        }
     }
 }
