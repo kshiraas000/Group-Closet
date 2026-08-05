@@ -37,6 +37,7 @@ final class ClosetDetailViewModel {
     }
 
     func loadItems(closetID: UUID) async {
+        errorMessage = nil
         do {
             let rows: [ItemShareRow] = try await client
                 .from("item_shares")
