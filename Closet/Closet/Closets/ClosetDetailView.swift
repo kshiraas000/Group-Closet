@@ -24,11 +24,23 @@ struct ClosetDetailView: View {
                 if viewModel.items.isEmpty {
                     Text("No items yet").foregroundStyle(.secondary)
                 } else {
-                    ForEach(viewModel.items) { item in
-                        VStack(alignment: .leading) {
-                            Text(item.category.rawValue)
-                            if let caption = item.caption {
-                                Text(caption).font(.footnote).foregroundStyle(.secondary)
+                    ForEach(viewModel.items) { browseItem in
+                        HStack {
+                            AsyncImage(url: browseItem.signedURL) { phase in
+                                if case .success(let image) = phase {
+                                    image.resizable().scaledToFill()
+                                } else {
+                                    Rectangle().fill(.secondary.opacity(0.2))
+                                }
+                            }
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                            VStack(alignment: .leading) {
+                                Text(browseItem.item.category.rawValue)
+                                if let caption = browseItem.item.caption {
+                                    Text(caption).font(.footnote).foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
