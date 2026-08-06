@@ -17,9 +17,6 @@ private struct PhotoRow: Decodable {
     }
 }
 
-private struct OwnerRow: Decodable {
-    let name: String
-}
 
 private struct RawBrowseItem: Decodable {
     let id: UUID
@@ -31,7 +28,6 @@ private struct RawBrowseItem: Decodable {
     let caption: String?
     let createdAt: Date
     let itemPhotos: [PhotoRow]
-    let users: OwnerRow
 
     enum CodingKeys: String, CodingKey {
         case id, category, size, color, caption
@@ -39,7 +35,6 @@ private struct RawBrowseItem: Decodable {
         case occasionTags = "occasion_tags"
         case createdAt = "created_at"
         case itemPhotos = "item_photos"
-        case users
     }
 }
 
@@ -51,7 +46,6 @@ struct BrowseItem: Identifiable {
     var id: UUID { item.id }
     let item: Item
     let photoPath: String?
-    let ownerName: String
     var signedURL: URL? = nil
 }
 
@@ -141,7 +135,7 @@ final class ClosetDetailViewModel {
         do {
             let rows: [ItemShareRow] = try await client
                 .from("item_shares")
-                .select("items(*, item_photos(photo_url, position), users(name))")
+                .select("items(*, item_photos(photo_url, position))")
                 .eq("closet_id", value: closetID)
                 .execute()
                 .value
@@ -168,7 +162,7 @@ final class ClosetDetailViewModel {
             createdAt: raw.createdAt
         )
         let photoPath = raw.itemPhotos.first(where: { $0.position == 0 })?.photoURL
-        return BrowseItem(item: item, photoPath: photoPath, ownerName: raw.users.name)
+        return BrowseItem(item: item, photoPath: photoPath)
     }
 
     private func loadSignedURLs() async {
