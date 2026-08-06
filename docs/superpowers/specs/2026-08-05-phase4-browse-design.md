@@ -40,17 +40,28 @@ struct BrowseItem: Identifiable {
 
 The existing `Item` struct (Task 2 of Phase 3, maps 1:1 to the `items` table) is left untouched — it's used elsewhere and shouldn't grow fields that belong to a join. `ClosetDetailViewModel.items` changes type from `[Item]` to `[BrowseItem]`.
 
-**Signed URLs:** after items load, collect the distinct non-nil `photoPath`s and make one batch call:
+**Signed URLs:** supabase-swift 2.54.1's batch `createSignedURLs(paths:expiresIn:)` does not accept a `transform` parameter — only the single-item `createSignedURL(path:expiresIn:transform:)` does. So instead of one batch call, fire one `createSignedURL` per distinct non-nil `photoPath` concurrently via a `TaskGroup`:
 
 ```swift
-client.storage.from("item-photos").createSignedURLs(
-    paths: paths,
-    expiresIn: 3600,
-    transform: TransformOptions(width: 400, height: 400, resize: .cover)
-)
+var results: [String: URL] = [:]
+await withTaskGroup(of: (String, URL?).self) { group in
+    for path in paths {
+        group.addTask {
+            let url = try? await client.storage.from("item-photos").createSignedURL(
+                path: path,
+                expiresIn: 3600,
+                transform: TransformOptions(width: 400, height: 400, resize: .cover)
+            )
+            return (path, url)
+        }
+    }
+    for await (path, url) in group {
+        if let url { results[path] = url }
+    }
+}
 ```
 
-(supabase-swift 2.54.1 supports this batch API.) Results are mapped back onto `BrowseItem.signedURL` by matching path. One request regardless of grid size, rather than one signed-URL call per cell.
+Results are mapped back onto `BrowseItem.signedURL` by matching path. This is N concurrent requests rather than 1, but preserves the actual goal (small transformed thumbnails, fast grid scroll) — acceptable at MVP data scale (a friend group's closet: tens of items, not thousands). Using the non-throwing `withTaskGroup` (each task swallows its own error via `try?`) means one item's signed-URL failure doesn't cancel the others — it just leaves that one path unmapped, matching §5's per-item placeholder behavior instead of an all-or-nothing failure.
 
 If this batch call fails, items still render — with a placeholder icon in place of the photo — rather than blocking the whole grid on a Storage error. This matches the existing pattern (see `cde9439`) of surfacing errors without hiding data that did load successfully.
 
