@@ -6,6 +6,7 @@ struct ShareToClosetsView: View {
     @Bindable var viewModel: AddItemViewModel
     @State private var otherClosets: [Closet] = []
     @State private var isLoadingClosets = true
+    @State private var closetsErrorMessage: String?
     let currentClosetID: UUID
     let ownerID: UUID
     let onDone: () -> Void
@@ -24,6 +25,8 @@ struct ShareToClosetsView: View {
                 Section("Also share to") {
                     if isLoadingClosets {
                         ProgressView()
+                    } else if let closetsErrorMessage {
+                        Text(closetsErrorMessage).foregroundStyle(.red)
                     } else if otherClosets.isEmpty {
                         Text("You're not in any other Closets").foregroundStyle(.secondary)
                     } else {
@@ -79,13 +82,18 @@ struct ShareToClosetsView: View {
 
     private func loadOtherClosets() async {
         isLoadingClosets = true
+        closetsErrorMessage = nil
         defer { isLoadingClosets = false }
-        let all: [Closet] = (try? await SupabaseService.shared
-            .from("closets")
-            .select()
-            .execute()
-            .value) ?? []
-        otherClosets = all.filter { $0.id != currentClosetID }
+        do {
+            let all: [Closet] = try await SupabaseService.shared
+                .from("closets")
+                .select()
+                .execute()
+                .value
+            otherClosets = all.filter { $0.id != currentClosetID }
+        } catch {
+            closetsErrorMessage = error.localizedDescription
+        }
     }
 
     @ViewBuilder

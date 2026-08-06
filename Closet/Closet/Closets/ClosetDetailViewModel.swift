@@ -19,10 +19,11 @@ final class ClosetDetailViewModel {
 
     private let client = SupabaseService.shared
 
-    func loadMembers(closetID: UUID) async {
-        errorMessage = nil
+    func load(closetID: UUID) async {
         isLoading = true
         defer { isLoading = false }
+        var failures: [String] = []
+
         do {
             let rows: [MemberRow] = try await client
                 .from("closet_members")
@@ -32,12 +33,9 @@ final class ClosetDetailViewModel {
                 .value
             members = rows.map(\.users)
         } catch {
-            errorMessage = error.localizedDescription
+            failures.append(error.localizedDescription)
         }
-    }
 
-    func loadItems(closetID: UUID) async {
-        errorMessage = nil
         do {
             let rows: [ItemShareRow] = try await client
                 .from("item_shares")
@@ -47,8 +45,10 @@ final class ClosetDetailViewModel {
                 .value
             items = rows.map(\.items)
         } catch {
-            errorMessage = error.localizedDescription
+            failures.append(error.localizedDescription)
         }
+
+        errorMessage = failures.isEmpty ? nil : failures.joined(separator: "\n")
     }
 
     func leave(closetID: UUID, userID: UUID) async -> Bool {

@@ -61,12 +61,11 @@ struct ClosetDetailView: View {
             }
         }
         .task {
-            await viewModel.loadMembers(closetID: closet.id)
-            await viewModel.loadItems(closetID: closet.id)
+            await viewModel.load(closetID: closet.id)
         }
         .sheet(isPresented: $showingAddItem) {
             AddItemView(closetID: closet.id, userID: userID) {
-                Task { await viewModel.loadItems(closetID: closet.id) }
+                Task { await viewModel.load(closetID: closet.id) }
             }
         }
         .confirmationDialog(
