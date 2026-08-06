@@ -55,14 +55,71 @@ struct BrowseItem: Identifiable {
     var signedURL: URL? = nil
 }
 
+struct BrowseFilters: Equatable {
+    var category: ItemCategory?
+    var ownerID: UUID?
+    var size: String?
+    var color: String?
+    var occasion: String?
+    var searchText: String = ""
+}
+
 @Observable
 final class ClosetDetailViewModel {
     var members: [UserProfile] = []
     var items: [BrowseItem] = []
+    var filters = BrowseFilters()
     var isLoading = true
     var errorMessage: String?
 
     private let client = SupabaseService.shared
+
+    var filteredItems: [BrowseItem] {
+        items.filter { browseItem in
+            if let category = filters.category, browseItem.item.category != category {
+                return false
+            }
+            if let ownerID = filters.ownerID, browseItem.item.ownerID != ownerID {
+                return false
+            }
+            if let size = filters.size, browseItem.item.size != size {
+                return false
+            }
+            if let color = filters.color, browseItem.item.color != color {
+                return false
+            }
+            if let occasion = filters.occasion, !browseItem.item.occasionTags.contains(occasion) {
+                return false
+            }
+            if !filters.searchText.isEmpty {
+                let query = filters.searchText.lowercased()
+                let haystack = [
+                    browseItem.item.caption,
+                    browseItem.item.category.rawValue,
+                    browseItem.item.color
+                ]
+                .compactMap { $0 }
+                .joined(separator: " ")
+                .lowercased()
+                if !haystack.contains(query) {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
+    var availableSizes: [String] {
+        Array(Set(items.compactMap { $0.item.size }.filter { !$0.isEmpty })).sorted()
+    }
+
+    var availableColors: [String] {
+        Array(Set(items.compactMap { $0.item.color }.filter { !$0.isEmpty })).sorted()
+    }
+
+    var availableOccasions: [String] {
+        Array(Set(items.flatMap { $0.item.occasionTags })).sorted()
+    }
 
     func load(closetID: UUID) async {
         isLoading = true
