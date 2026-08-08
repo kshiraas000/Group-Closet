@@ -7,7 +7,7 @@ struct MainTabView: View {
         TabView {
             ClosetsListView(userID: userID)
                 .tabItem { Label("Closets", systemImage: "door.left.hand.open") }
-            Text("My Clothes")
+            MyClothesView(userID: userID)
                 .tabItem { Label("My Clothes", systemImage: "tshirt") }
             Text("Profile")
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
