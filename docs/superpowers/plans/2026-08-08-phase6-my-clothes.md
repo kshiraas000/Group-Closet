@@ -653,11 +653,16 @@ select throws_ok(
   'Bob cannot insert an item on Alice''s behalf'
 );
 
-select throws_ok(
-  $$delete from public.item_shares where item_id = '44444444-4444-4444-4444-444444444444' and closet_id = '33333333-3333-3333-3333-333333333333'$$,
-  '42501',
-  null,
-  'Bob cannot delete a share for an item he does not own'
+-- A DELETE governed only by a `USING` policy never raises 42501 the way an
+-- INSERT/UPDATE `WITH CHECK` violation does — RLS just filters the row out,
+-- so the statement silently affects 0 rows. Assert that instead of throws_ok.
+delete from public.item_shares
+where item_id = '44444444-4444-4444-4444-444444444444' and closet_id = '33333333-3333-3333-3333-333333333333';
+
+select is(
+  (select count(*)::int from public.item_shares where item_id = '44444444-4444-4444-4444-444444444444'),
+  1,
+  'Bob''s delete attempt does not remove Alice''s share (RLS filters it silently)'
 );
 
 set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
