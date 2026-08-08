@@ -9,6 +9,7 @@ final class ItemDetailViewModel {
     var allClosets: [Closet] = []
     var sharedClosetIDs: Set<UUID> = []
     var shareStateErrorMessage: String?
+    var isLoadingShareState = false
 
     private let client = SupabaseService.shared
 
@@ -30,6 +31,10 @@ final class ItemDetailViewModel {
 
     func loadShareState(itemID: UUID) async {
         shareStateErrorMessage = nil
+        isLoadingShareState = true
+        defer { isLoadingShareState = false }
+        allClosets = []
+        sharedClosetIDs = []
 
         do {
             allClosets = try await client

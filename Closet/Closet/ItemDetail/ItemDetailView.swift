@@ -7,11 +7,13 @@ struct ItemDetailView: View {
     let items: [BrowseItem]
     let members: [UserProfile]
     let userID: UUID
+    let onShareChanged: () -> Void
 
-    init(items: [BrowseItem], startIndex: Int, members: [UserProfile], userID: UUID) {
+    init(items: [BrowseItem], startIndex: Int, members: [UserProfile], userID: UUID, onShareChanged: @escaping () -> Void = {}) {
         self.items = items
         self.members = members
         self.userID = userID
+        self.onShareChanged = onShareChanged
         _currentIndex = State(initialValue: startIndex)
     }
 
@@ -134,19 +136,26 @@ struct ItemDetailView: View {
                 Text(shareStateErrorMessage).font(.footnote).foregroundStyle(.red)
             }
 
-            ForEach(viewModel.allClosets) { closet in
-                Button {
-                    Task { await viewModel.toggleShare(itemID: currentItem.item.id, closetID: closet.id) }
-                } label: {
-                    HStack {
-                        Text(closet.name)
-                        Spacer()
-                        if viewModel.sharedClosetIDs.contains(closet.id) {
-                            Image(systemName: "checkmark")
+            if viewModel.isLoadingShareState {
+                ProgressView()
+            } else {
+                ForEach(viewModel.allClosets) { closet in
+                    Button {
+                        Task {
+                            await viewModel.toggleShare(itemID: currentItem.item.id, closetID: closet.id)
+                            onShareChanged()
+                        }
+                    } label: {
+                        HStack {
+                            Text(closet.name)
+                            Spacer()
+                            if viewModel.sharedClosetIDs.contains(closet.id) {
+                                Image(systemName: "checkmark")
+                            }
                         }
                     }
+                    .foregroundStyle(.primary)
                 }
-                .foregroundStyle(.primary)
             }
         }
         .padding(.top, 8)

@@ -48,6 +48,9 @@ struct MyClothesView: View {
             .task {
                 await viewModel.load(userID: userID)
             }
+            .refreshable {
+                await viewModel.load(userID: userID)
+            }
             .fullScreenCover(item: $detailContext) { context in
                 ItemDetailView(
                     items: context.items,

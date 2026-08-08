@@ -85,7 +85,13 @@ struct ClosetDetailView: View {
             }
         }
         .fullScreenCover(item: $detailContext) { context in
-            ItemDetailView(items: context.items, startIndex: context.startIndex, members: viewModel.members, userID: userID)
+            ItemDetailView(
+                items: context.items,
+                startIndex: context.startIndex,
+                members: viewModel.members,
+                userID: userID,
+                onShareChanged: { Task { await viewModel.load(closetID: closet.id) } }
+            )
         }
         .confirmationDialog(
             "Leave \(closet.name)?",

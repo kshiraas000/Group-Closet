@@ -1,5 +1,5 @@
 begin;
-select plan(14);
+select plan(15);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'alice@example.com'),
@@ -142,6 +142,14 @@ select is(
   (select count(*)::int from public.items where id = '44444444-4444-4444-4444-444444444444'),
   0,
   'Bob can no longer see the item after Alice removes the share'
+);
+
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+select is(
+  (select count(*)::int from public.items where id = '44444444-4444-4444-4444-444444444444'),
+  1,
+  'Alice can still see her own item after unsharing it from every closet'
 );
 
 select * from finish();
