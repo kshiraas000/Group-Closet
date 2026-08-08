@@ -37,9 +37,9 @@ struct ClosetDetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     LazyVGrid(columns: gridColumns, spacing: 2) {
-                        ForEach(Array(viewModel.filteredItems.enumerated()), id: \.element.id) { index, browseItem in
+                        ForEach(viewModel.filteredItems) { browseItem in
                             Button {
-                                detailContext = ItemDetailContext(items: viewModel.filteredItems, startIndex: index)
+                                openDetail(for: browseItem)
                             } label: {
                                 itemCell(browseItem)
                             }
@@ -101,6 +101,13 @@ struct ClosetDetailView: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private func openDetail(for browseItem: BrowseItem) {
+        let snapshot = viewModel.filteredItems
+        if let index = snapshot.firstIndex(where: { $0.id == browseItem.id }) {
+            detailContext = ItemDetailContext(items: snapshot, startIndex: index)
         }
     }
 
