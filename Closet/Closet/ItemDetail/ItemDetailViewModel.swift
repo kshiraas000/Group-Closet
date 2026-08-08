@@ -120,7 +120,11 @@ final class ItemDetailViewModel {
                     case blockedID = "blocked_id"
                 }
             }
-            try await client.from("blocks").insert(NewBlock(blockerID: blockerID, blockedID: blockedID)).execute()
+            try await client.from("blocks").upsert(
+                NewBlock(blockerID: blockerID, blockedID: blockedID),
+                onConflict: "blocker_id,blocked_id",
+                ignoreDuplicates: true
+            ).execute()
             return true
         } catch {
             return false

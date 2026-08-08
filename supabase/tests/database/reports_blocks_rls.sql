@@ -1,5 +1,5 @@
 begin;
-select plan(9);
+select plan(10);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'alice@example.com'),
@@ -117,6 +117,14 @@ select is(
   (select count(*)::int from public.items where id = '44444444-4444-4444-4444-444444444444'),
   0,
   'Bob can no longer see Alice''s item after Alice blocked him (mutual hide)'
+);
+
+select is(
+  (select count(*)::int from public.item_shares s
+     join public.items i on i.id = s.item_id
+   where s.closet_id = '33333333-3333-3333-3333-333333333333'),
+  1,
+  'After the block, the closet''s item_shares join yields only the viewer''s own item'
 );
 
 select * from finish();

@@ -87,7 +87,7 @@ final class ClosetDetailViewModel {
         do {
             let rows: [ItemShareRow] = try await client
                 .from("item_shares")
-                .select("items(*, item_photos(photo_url, position))")
+                .select("items!inner(*, item_photos(photo_url, position))")
                 .eq("closet_id", value: closetID)
                 .execute()
                 .value
