@@ -92,4 +92,38 @@ final class ItemDetailViewModel {
         }
         await loadShareState(itemID: itemID)
     }
+
+    func report(itemID: UUID, reporterID: UUID) async -> Bool {
+        do {
+            struct NewReport: Encodable {
+                let itemID: UUID
+                let reporterID: UUID
+                enum CodingKeys: String, CodingKey {
+                    case itemID = "item_id"
+                    case reporterID = "reporter_id"
+                }
+            }
+            try await client.from("reports").insert(NewReport(itemID: itemID, reporterID: reporterID)).execute()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func block(blockedID: UUID, blockerID: UUID) async -> Bool {
+        do {
+            struct NewBlock: Encodable {
+                let blockerID: UUID
+                let blockedID: UUID
+                enum CodingKeys: String, CodingKey {
+                    case blockerID = "blocker_id"
+                    case blockedID = "blocked_id"
+                }
+            }
+            try await client.from("blocks").insert(NewBlock(blockerID: blockerID, blockedID: blockedID)).execute()
+            return true
+        } catch {
+            return false
+        }
+    }
 }

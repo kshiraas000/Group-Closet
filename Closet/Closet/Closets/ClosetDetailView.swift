@@ -90,7 +90,8 @@ struct ClosetDetailView: View {
                 startIndex: context.startIndex,
                 members: viewModel.members,
                 userID: userID,
-                onShareChanged: { Task { await viewModel.load(closetID: closet.id) } }
+                onShareChanged: { Task { await viewModel.load(closetID: closet.id) } },
+                onBlocked: { Task { await viewModel.load(closetID: closet.id) } }
             )
         }
         .confirmationDialog(

@@ -3,17 +3,23 @@ import SwiftUI
 struct ItemDetailView: View {
     @State private var viewModel = ItemDetailViewModel()
     @State private var currentIndex: Int
+    @State private var showingReportConfirmation = false
+    @State private var showingBlockConfirmation = false
+    @State private var showingActionAlert = false
+    @State private var actionAlertMessage = ""
     @Environment(\.dismiss) private var dismiss
     let items: [BrowseItem]
     let members: [UserProfile]
     let userID: UUID
     let onShareChanged: () -> Void
+    let onBlocked: () -> Void
 
-    init(items: [BrowseItem], startIndex: Int, members: [UserProfile], userID: UUID, onShareChanged: @escaping () -> Void = {}) {
+    init(items: [BrowseItem], startIndex: Int, members: [UserProfile], userID: UUID, onShareChanged: @escaping () -> Void = {}, onBlocked: @escaping () -> Void = {}) {
         self.items = items
         self.members = members
         self.userID = userID
         self.onShareChanged = onShareChanged
+        self.onBlocked = onBlocked
         _currentIndex = State(initialValue: startIndex)
     }
 
@@ -42,6 +48,36 @@ struct ItemDetailView: View {
             if isOwner {
                 await viewModel.loadShareState(itemID: currentItem.item.id)
             }
+        }
+        .confirmationDialog("Report this item?", isPresented: $showingReportConfirmation, titleVisibility: .visible) {
+            Button("Report", role: .destructive) {
+                Task {
+                    let success = await viewModel.report(itemID: currentItem.item.id, reporterID: userID)
+                    actionAlertMessage = success ? "Reported" : "Something went wrong. Please try again."
+                    showingActionAlert = true
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Block \(ownerName)?", isPresented: $showingBlockConfirmation, titleVisibility: .visible) {
+            Button("Block", role: .destructive) {
+                Task {
+                    let success = await viewModel.block(blockedID: currentItem.item.ownerID, blockerID: userID)
+                    if success {
+                        onBlocked()
+                        dismiss()
+                    } else {
+                        actionAlertMessage = "Something went wrong. Please try again."
+                        showingActionAlert = true
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("", isPresented: $showingActionAlert) {
+            Button("OK") {}
+        } message: {
+            Text(actionAlertMessage)
         }
     }
 
@@ -169,8 +205,8 @@ struct ItemDetailView: View {
                 Button("Delete", role: .destructive) {}
                     .disabled(true)
             } else {
-                Button("Report") {}
-                    .disabled(true)
+                Button("Report") { showingReportConfirmation = true }
+                Button("Block \(ownerName)", role: .destructive) { showingBlockConfirmation = true }
             }
         } label: {
             Image(systemName: "ellipsis.circle")
