@@ -37,6 +37,9 @@ struct ItemDetailView: View {
         .preferredColorScheme(.dark)
         .task(id: currentIndex) {
             await viewModel.loadFullResURL(for: currentItem)
+            if isOwner {
+                await viewModel.loadShareState(itemID: currentItem.item.id)
+            }
         }
     }
 
@@ -111,12 +114,42 @@ struct ItemDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            if isOwner {
+                sharedToSection
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .overlay(alignment: .bottomTrailing) {
             moreMenu
         }
+    }
+
+    private var sharedToSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Shared to").font(.footnote).foregroundStyle(.secondary)
+
+            if let shareStateErrorMessage = viewModel.shareStateErrorMessage {
+                Text(shareStateErrorMessage).font(.footnote).foregroundStyle(.red)
+            }
+
+            ForEach(viewModel.allClosets) { closet in
+                Button {
+                    Task { await viewModel.toggleShare(itemID: currentItem.item.id, closetID: closet.id) }
+                } label: {
+                    HStack {
+                        Text(closet.name)
+                        Spacer()
+                        if viewModel.sharedClosetIDs.contains(closet.id) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .foregroundStyle(.primary)
+            }
+        }
+        .padding(.top, 8)
     }
 
     private var moreMenu: some View {
