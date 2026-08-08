@@ -1,9 +1,16 @@
 import SwiftUI
 
+private struct ItemDetailContext: Identifiable {
+    let id = UUID()
+    let items: [BrowseItem]
+    let startIndex: Int
+}
+
 struct ClosetDetailView: View {
     @State private var viewModel = ClosetDetailViewModel()
     @State private var showingLeaveConfirmation = false
     @State private var showingAddItem = false
+    @State private var detailContext: ItemDetailContext?
     @Environment(\.dismiss) private var dismiss
     let closet: Closet
     let userID: UUID
@@ -30,8 +37,13 @@ struct ClosetDetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     LazyVGrid(columns: gridColumns, spacing: 2) {
-                        ForEach(viewModel.filteredItems) { browseItem in
-                            itemCell(browseItem)
+                        ForEach(Array(viewModel.filteredItems.enumerated()), id: \.element.id) { index, browseItem in
+                            Button {
+                                detailContext = ItemDetailContext(items: viewModel.filteredItems, startIndex: index)
+                            } label: {
+                                itemCell(browseItem)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .listRowInsets(EdgeInsets())
@@ -71,6 +83,9 @@ struct ClosetDetailView: View {
             AddItemView(closetID: closet.id, userID: userID) {
                 Task { await viewModel.load(closetID: closet.id) }
             }
+        }
+        .fullScreenCover(item: $detailContext) { context in
+            ItemDetailView(items: context.items, startIndex: context.startIndex, members: viewModel.members, userID: userID)
         }
         .confirmationDialog(
             "Leave \(closet.name)?",
