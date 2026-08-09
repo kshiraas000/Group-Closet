@@ -276,6 +276,8 @@ func unblock(blockedID: UUID, blockerID: UUID) async {
 
 The same closure is reused after a successful account deletion (§6) — clearing the local session is the same mechanical action either way.
 
+**A real gap this makes reachable for the first time:** `RootView`'s `@State private var hasProfile: Bool?` persists for as long as `RootView` itself stays alive — which, since it sits at the app's root, is the whole app session. Sign-out has existed on `AuthViewModel` since Phase 1 but was never callable from anywhere, so `hasProfile` never had a reason to go stale. Now that it's reachable: if Alice signs out and a *different* user (say, Bob, who hasn't onboarded) signs in on the same device, `hasProfile` still holds Alice's earlier `true` and `RootView` would send Bob straight into `MainTabView` under his own `userID`, skipping `OnboardingView` entirely — his `users` row would never get created, breaking every subsequent load that assumes it exists. Fix: the `onSignedOut` closure passed into `MainTabView` also resets `hasProfile = nil` before calling `signOut()`, so the next sign-in re-triggers `checkProfile`, regardless of whether it's the same person or someone new.
+
 ## 6. Delete Account
 
 A `SECURITY DEFINER` function, callable via RPC, deletes the caller's own `auth.users` row:
