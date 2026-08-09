@@ -114,7 +114,10 @@ struct ProfileView: View {
     private func loadAndUploadPhoto(_ item: PhotosPickerItem?) async {
         guard let item else { return }
         guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data) else { return }
+              let image = UIImage(data: data) else {
+            viewModel.reportInvalidPhoto()
+            return
+        }
         await viewModel.uploadPhoto(image, userID: userID)
     }
 }

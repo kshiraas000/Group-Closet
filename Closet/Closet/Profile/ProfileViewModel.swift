@@ -28,6 +28,8 @@ final class ProfileViewModel {
     func load(userID: UUID) async {
         isLoading = true
         defer { isLoading = false }
+        var failures: [String] = []
+
         do {
             let profile: UserProfile = try await client
                 .from("users")
@@ -41,14 +43,19 @@ final class ProfileViewModel {
             bottomSize = profile.sizes["bottom"] ?? ""
             shoeSize = profile.sizes["shoe"] ?? ""
             photoPath = profile.photoURL
-            errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            failures.append(error.localizedDescription)
         }
+
         if let photoPath {
             await loadSignedPhotoURL(path: photoPath)
         }
-        await loadBlockedUsers()
+
+        if let blockedUsersError = await loadBlockedUsers() {
+            failures.append(blockedUsersError)
+        }
+
+        errorMessage = failures.isEmpty ? nil : failures.joined(separator: "\n")
     }
 
     func save(userID: UUID) async -> Bool {
@@ -120,7 +127,8 @@ final class ProfileViewModel {
         )
     }
 
-    func loadBlockedUsers() async {
+    @discardableResult
+    func loadBlockedUsers() async -> String? {
         do {
             struct BlockRow: Decodable {
                 let blockedID: UUID
@@ -134,7 +142,7 @@ final class ProfileViewModel {
             let blockedIDs = rows.map(\.blockedID)
             guard !blockedIDs.isEmpty else {
                 blockedUsers = []
-                return
+                return nil
             }
 
             struct NameRow: Decodable {
@@ -148,9 +156,9 @@ final class ProfileViewModel {
                 .execute()
                 .value
             blockedUsers = names.map { BlockedUser(id: $0.id, name: $0.name) }
-            errorMessage = nil
+            return nil
         } catch {
-            errorMessage = error.localizedDescription
+            return error.localizedDescription
         }
     }
 
@@ -162,10 +170,14 @@ final class ProfileViewModel {
                 .eq("blocker_id", value: blockerID)
                 .eq("blocked_id", value: blockedID)
                 .execute()
-            await loadBlockedUsers()
+            errorMessage = await loadBlockedUsers()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func reportInvalidPhoto() {
+        errorMessage = "Could not load the selected photo"
     }
 
     func deleteAccount() async -> Bool {
