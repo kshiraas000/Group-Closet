@@ -129,8 +129,21 @@ insert into public.users (id, name) values
   ('11111111-1111-1111-1111-111111111111', 'Alice'),
   ('22222222-2222-2222-2222-222222222222', 'Bob');
 
--- Alice and Bob share no closet, isolating the new "view profiles of
--- people you've blocked" policy from the pre-existing closet-mates policy.
+-- Alice and Bob share no closet at the point the blocked-profile-view
+-- policy is tested below, isolating it from the pre-existing closet-mates
+-- policy. This closet/membership fixture is only for the delete_own_account
+-- cascade checks near the end of this file, and must be inserted now, as
+-- the superuser session role — public.closets/closet_members were never
+-- granted direct INSERT to authenticated (Phase 2 routes closet
+-- creation/joining only through the create_closet()/
+-- join_closet_by_invite_code() SECURITY DEFINER RPCs), so this would fail
+-- with "permission denied for table closets" if attempted after switching
+-- to authenticated below.
+insert into public.closets (id, name, invite_code, created_by)
+values ('33333333-3333-3333-3333-333333333333', 'Alice''s Closet', 'testcode', '11111111-1111-1111-1111-111111111111');
+
+insert into public.closet_members (user_id, closet_id)
+values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333');
 
 set local role authenticated;
 set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
@@ -167,6 +180,15 @@ select is(
 delete from public.blocks
 where blocker_id = '11111111-1111-1111-1111-111111111111' and blocked_id = '22222222-2222-2222-2222-222222222222';
 
+-- Bob's own "Users can view their own blocks" policy (blocker_id =
+-- auth.uid()) would hide Alice's row from him regardless of whether his
+-- delete attempt actually succeeded — Bob is never the blocker on this row,
+-- so a count from his vantage point is always 0 and can't distinguish "row
+-- still there, hidden from Bob" from "row deleted." Verify from a vantage
+-- point that can actually see it, same pattern already used below for the
+-- delete_own_account() checks.
+reset role;
+
 select is(
   (select count(*)::int from public.blocks where blocker_id = '11111111-1111-1111-1111-111111111111'),
   1,
@@ -185,19 +207,19 @@ select is(
   'Alice can remove her own block'
 );
 
--- Set up data to verify delete_own_account() cascades correctly and does
--- not touch Bob's data.
-insert into public.closets (id, name, invite_code, created_by)
-values ('33333333-3333-3333-3333-333333333333', 'Alice''s Closet', 'testcode', '11111111-1111-1111-1111-111111111111');
-
-insert into public.closet_members (user_id, closet_id)
-values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333');
-
+-- Items for the delete_own_account() cascade checks below. items has its
+-- own INSERT policy scoped to owner_id = auth.uid() (Phase 3), so these
+-- work fine directly under authenticated, unlike closets/closet_members
+-- above.
 insert into public.items (id, owner_id, category)
 values ('44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'Top');
 
+set local request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
 insert into public.items (id, owner_id, category)
 values ('66666666-6666-6666-6666-666666666666', '22222222-2222-2222-2222-222222222222', 'Bottom');
+
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 
 select public.delete_own_account();
 
