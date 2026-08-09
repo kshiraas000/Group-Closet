@@ -18,6 +18,7 @@ final class ProfileViewModel {
     var photoPath: String?
     var signedPhotoURL: URL?
     var blockedUsers: [BlockedUser] = []
+    var hasLoadedProfile = false
     var isLoading = true
     var isSaving = false
     var isUploadingPhoto = false
@@ -43,6 +44,7 @@ final class ProfileViewModel {
             bottomSize = profile.sizes["bottom"] ?? ""
             shoeSize = profile.sizes["shoe"] ?? ""
             photoPath = profile.photoURL
+            hasLoadedProfile = true
         } catch {
             failures.append(error.localizedDescription)
         }
@@ -127,7 +129,6 @@ final class ProfileViewModel {
         )
     }
 
-    @discardableResult
     func loadBlockedUsers() async -> String? {
         do {
             struct BlockRow: Decodable {
@@ -177,7 +178,7 @@ final class ProfileViewModel {
     }
 
     func reportInvalidPhoto() {
-        errorMessage = "Could not load the selected photo"
+        errorMessage = "Could not load that photo"
     }
 
     func deleteAccount() async -> Bool {

@@ -25,7 +25,7 @@ final class AuthViewModel {
     }
 
     func signOut() async throws {
+        defer { session = nil }
         try await client.auth.signOut()
-        session = nil
     }
 }

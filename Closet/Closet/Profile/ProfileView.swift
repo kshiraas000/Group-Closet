@@ -10,83 +10,89 @@ struct ProfileView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 8) {
-                            AsyncImage(url: viewModel.signedPhotoURL) { phase in
-                                if case .success(let image) = phase {
-                                    image.resizable().scaledToFill()
-                                } else {
-                                    Image(systemName: "person.crop.circle.fill")
-                                        .resizable()
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(width: 96, height: 96)
-                            .clipShape(Circle())
-
-                            PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                                Text(viewModel.isUploadingPhoto ? "Uploading..." : "Change Photo")
-                            }
-                            .disabled(viewModel.isUploadingPhoto)
-                            .onChange(of: selectedPhoto) { _, newValue in
-                                Task { await loadAndUploadPhoto(newValue) }
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-
-                Section("Your name") {
-                    TextField("Name", text: $viewModel.name)
-                }
-
-                Section("Your usual sizes") {
-                    TextField("Top", text: $viewModel.topSize)
-                    TextField("Bottom", text: $viewModel.bottomSize)
-                    TextField("Shoe", text: $viewModel.shoeSize)
-                }
-
-                if let errorMessage = viewModel.errorMessage {
-                    Section {
-                        Text(errorMessage).foregroundStyle(.red)
-                    }
-                }
-
-                Section {
-                    Button(viewModel.isSaving ? "Saving..." : "Save") {
-                        Task { await viewModel.save(userID: userID) }
-                    }
-                    .disabled(viewModel.isSaving)
-                }
-
-                Section("Blocked Users") {
-                    if viewModel.blockedUsers.isEmpty {
-                        Text("No blocked users").foregroundStyle(.secondary)
-                    } else {
-                        ForEach(viewModel.blockedUsers) { blockedUser in
+            Group {
+                if viewModel.isLoading {
+                    ProgressView()
+                } else {
+                    Form {
+                        Section {
                             HStack {
-                                Text(blockedUser.name)
                                 Spacer()
-                                Button("Unblock") {
-                                    Task { await viewModel.unblock(blockedID: blockedUser.id, blockerID: userID) }
+                                VStack(spacing: 8) {
+                                    AsyncImage(url: viewModel.signedPhotoURL) { phase in
+                                        if case .success(let image) = phase {
+                                            image.resizable().scaledToFill()
+                                        } else {
+                                            Image(systemName: "person.crop.circle.fill")
+                                                .resizable()
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .frame(width: 96, height: 96)
+                                    .clipShape(Circle())
+
+                                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                        Text(viewModel.isUploadingPhoto ? "Uploading..." : "Change Photo")
+                                    }
+                                    .disabled(viewModel.isUploadingPhoto)
+                                    .onChange(of: selectedPhoto) { _, newValue in
+                                        Task { await loadAndUploadPhoto(newValue) }
+                                    }
+                                }
+                                Spacer()
+                            }
+                        }
+
+                        Section("Your name") {
+                            TextField("Name", text: $viewModel.name)
+                        }
+
+                        Section("Your usual sizes") {
+                            TextField("Top", text: $viewModel.topSize)
+                            TextField("Bottom", text: $viewModel.bottomSize)
+                            TextField("Shoe", text: $viewModel.shoeSize)
+                        }
+
+                        if let errorMessage = viewModel.errorMessage {
+                            Section {
+                                Text(errorMessage).foregroundStyle(.red)
+                            }
+                        }
+
+                        Section {
+                            Button(viewModel.isSaving ? "Saving..." : "Save") {
+                                Task { await viewModel.save(userID: userID) }
+                            }
+                            .disabled(viewModel.isSaving || !viewModel.hasLoadedProfile)
+                        }
+
+                        Section("Blocked Users") {
+                            if viewModel.blockedUsers.isEmpty {
+                                Text("No blocked users").foregroundStyle(.secondary)
+                            } else {
+                                ForEach(viewModel.blockedUsers) { blockedUser in
+                                    HStack {
+                                        Text(blockedUser.name)
+                                        Spacer()
+                                        Button("Unblock") {
+                                            Task { await viewModel.unblock(blockedID: blockedUser.id, blockerID: userID) }
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
 
-                Section {
-                    Button("Sign Out") {
-                        Task { await onSignedOut() }
-                    }
-                }
+                        Section {
+                            Button("Sign Out") {
+                                Task { await onSignedOut() }
+                            }
+                        }
 
-                Section {
-                    Button("Delete Account", role: .destructive) {
-                        showingDeleteConfirmation = true
+                        Section {
+                            Button("Delete Account", role: .destructive) {
+                                showingDeleteConfirmation = true
+                            }
+                        }
                     }
                 }
             }
