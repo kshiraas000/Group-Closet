@@ -16,7 +16,10 @@ struct RootView: View {
                 if hasProfile == nil {
                     ProgressView().task { await checkProfile(userID: userID) }
                 } else if hasProfile == true {
-                    MainTabView(userID: userID)
+                    MainTabView(userID: userID, onSignedOut: {
+                        hasProfile = nil
+                        try? await authViewModel.signOut()
+                    })
                 } else {
                     OnboardingView(userID: userID) {
                         hasProfile = true
