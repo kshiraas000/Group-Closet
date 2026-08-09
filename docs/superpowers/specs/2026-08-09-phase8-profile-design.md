@@ -276,7 +276,18 @@ func unblock(blockedID: UUID, blockerID: UUID) async {
 
 The same closure is reused after a successful account deletion (§6) — clearing the local session is the same mechanical action either way.
 
-**A real gap this makes reachable for the first time:** `RootView`'s `@State private var hasProfile: Bool?` persists for as long as `RootView` itself stays alive — which, since it sits at the app's root, is the whole app session. Sign-out has existed on `AuthViewModel` since Phase 1 but was never callable from anywhere, so `hasProfile` never had a reason to go stale. Now that it's reachable: if Alice signs out and a *different* user (say, Bob, who hasn't onboarded) signs in on the same device, `hasProfile` still holds Alice's earlier `true` and `RootView` would send Bob straight into `MainTabView` under his own `userID`, skipping `OnboardingView` entirely — his `users` row would never get created, breaking every subsequent load that assumes it exists. Fix: the `onSignedOut` closure passed into `MainTabView` also resets `hasProfile = nil` before calling `signOut()`, so the next sign-in re-triggers `checkProfile`, regardless of whether it's the same person or someone new.
+**A real gap this makes reachable for the first time:** `RootView`'s `@State private var hasProfile: Bool?` persists for as long as `RootView` itself stays alive — which, since it sits at the app's root, is the whole app session. Sign-out has existed on `AuthViewModel` since Phase 1 but was never callable from anywhere, so `hasProfile` never had a reason to go stale. Now that it's reachable: if Alice signs out and a *different* user (say, Bob, who hasn't onboarded) signs in on the same device, `hasProfile` still holds Alice's earlier `true` and `RootView` would send Bob straight into `MainTabView` under his own `userID`, skipping `OnboardingView` entirely — his `users` row would never get created, breaking every subsequent load that assumes it exists. Fix: the `onSignedOut` closure passed into `MainTabView` also resets `hasProfile = nil`, so the next sign-in re-triggers `checkProfile`, regardless of whether it's the same person or someone new.
+
+**Ordering matters here, and the final whole-plan review caught a real bug in this design's first draft:** the reset must happen *after* `signOut()` completes, not before. supabase-swift clears its local session before making the network sign-out call, so if `hasProfile = nil` runs first, `RootView` re-enters the `hasProfile == nil` branch *while `authViewModel.session` is still non-nil* and fires `checkProfile` concurrently with the in-flight sign-out — racing an unauthenticated `users` count query against session teardown. If that race resolves to `hasProfile = false`, the very next sign-in (including the same user signing straight back in) is routed through `OnboardingView` instead of `MainTabView`, and `OnboardingViewModel.save`'s upsert overwrites the real profile — including nulling `photo_url` and replacing saved sizes — with blank onboarding defaults. Silent data loss on the phase's own happy path. Correct ordering:
+
+```swift
+onSignedOut: {
+    try? await authViewModel.signOut()
+    hasProfile = nil
+}
+```
+
+Once `signOut()` completes and `session` is `nil`, `RootView` renders `SignInView` — which reads neither `hasProfile` nor `checkProfile` — so resetting afterward is both safe and sufficient; there is no window where a stale or racing value can be read.
 
 ## 6. Delete Account
 

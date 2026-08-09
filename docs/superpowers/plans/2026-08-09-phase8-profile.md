@@ -26,7 +26,7 @@
 - Create: `supabase/migrations/20260809000000_profile_photos_and_account_deletion.sql` — `profile-photos` bucket + RLS, `blocks` SELECT/DELETE, the new `users` blocked-profile-view policy, `delete_own_account()`
 - Create: `supabase/tests/database/profile_rls.sql` — pgTAP coverage
 - Create: `Closet/Closet/Profile/ProfileViewModel.swift`, `Closet/Closet/Profile/ProfileView.swift`
-- Modify: `Closet/Closet/MainTabView.swift`, `Closet/Closet/RootView.swift`
+- Modify: `Closet/Closet/MainTabView.swift`, `Closet/Closet/RootView.swift`, `Closet/Closet/Auth/AuthViewModel.swift`
 
 ---
 
@@ -279,6 +279,7 @@ git commit -m "Add profile-photos bucket, blocked-list access, and account delet
 - Create: `Closet/Closet/Profile/ProfileView.swift`
 - Modify: `Closet/Closet/MainTabView.swift`
 - Modify: `Closet/Closet/RootView.swift`
+- Modify: `Closet/Closet/Auth/AuthViewModel.swift`
 
 **Interfaces:**
 - Consumes: `profile-photos` bucket RLS, `blocks` SELECT/DELETE, `delete_own_account()` (Task 1), `ImageCompressor` (Phase 3), `AuthViewModel.signOut()` (Phase 1)
@@ -309,6 +310,7 @@ final class ProfileViewModel {
     var photoPath: String?
     var signedPhotoURL: URL?
     var blockedUsers: [BlockedUser] = []
+    var hasLoadedProfile = false
     var isLoading = true
     var isSaving = false
     var isUploadingPhoto = false
@@ -319,6 +321,8 @@ final class ProfileViewModel {
     func load(userID: UUID) async {
         isLoading = true
         defer { isLoading = false }
+        var failures: [String] = []
+
         do {
             let profile: UserProfile = try await client
                 .from("users")
@@ -332,14 +336,20 @@ final class ProfileViewModel {
             bottomSize = profile.sizes["bottom"] ?? ""
             shoeSize = profile.sizes["shoe"] ?? ""
             photoPath = profile.photoURL
-            errorMessage = nil
+            hasLoadedProfile = true
         } catch {
-            errorMessage = error.localizedDescription
+            failures.append(error.localizedDescription)
         }
+
         if let photoPath {
             await loadSignedPhotoURL(path: photoPath)
         }
-        await loadBlockedUsers()
+
+        if let blockedUsersError = await loadBlockedUsers() {
+            failures.append(blockedUsersError)
+        }
+
+        errorMessage = failures.isEmpty ? nil : failures.joined(separator: "\n")
     }
 
     func save(userID: UUID) async -> Bool {
@@ -411,7 +421,7 @@ final class ProfileViewModel {
         )
     }
 
-    func loadBlockedUsers() async {
+    func loadBlockedUsers() async -> String? {
         do {
             struct BlockRow: Decodable {
                 let blockedID: UUID
@@ -425,7 +435,7 @@ final class ProfileViewModel {
             let blockedIDs = rows.map(\.blockedID)
             guard !blockedIDs.isEmpty else {
                 blockedUsers = []
-                return
+                return nil
             }
 
             struct NameRow: Decodable {
@@ -439,9 +449,9 @@ final class ProfileViewModel {
                 .execute()
                 .value
             blockedUsers = names.map { BlockedUser(id: $0.id, name: $0.name) }
-            errorMessage = nil
+            return nil
         } catch {
-            errorMessage = error.localizedDescription
+            return error.localizedDescription
         }
     }
 
@@ -453,10 +463,14 @@ final class ProfileViewModel {
                 .eq("blocker_id", value: blockerID)
                 .eq("blocked_id", value: blockedID)
                 .execute()
-            await loadBlockedUsers()
+            errorMessage = await loadBlockedUsers()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func reportInvalidPhoto() {
+        errorMessage = "Could not load that photo"
     }
 
     func deleteAccount() async -> Bool {
@@ -488,83 +502,89 @@ struct ProfileView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 8) {
-                            AsyncImage(url: viewModel.signedPhotoURL) { phase in
-                                if case .success(let image) = phase {
-                                    image.resizable().scaledToFill()
-                                } else {
-                                    Image(systemName: "person.crop.circle.fill")
-                                        .resizable()
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(width: 96, height: 96)
-                            .clipShape(Circle())
-
-                            PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                                Text(viewModel.isUploadingPhoto ? "Uploading..." : "Change Photo")
-                            }
-                            .disabled(viewModel.isUploadingPhoto)
-                            .onChange(of: selectedPhoto) { _, newValue in
-                                Task { await loadAndUploadPhoto(newValue) }
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-
-                Section("Your name") {
-                    TextField("Name", text: $viewModel.name)
-                }
-
-                Section("Your usual sizes") {
-                    TextField("Top", text: $viewModel.topSize)
-                    TextField("Bottom", text: $viewModel.bottomSize)
-                    TextField("Shoe", text: $viewModel.shoeSize)
-                }
-
-                if let errorMessage = viewModel.errorMessage {
-                    Section {
-                        Text(errorMessage).foregroundStyle(.red)
-                    }
-                }
-
-                Section {
-                    Button(viewModel.isSaving ? "Saving..." : "Save") {
-                        Task { await viewModel.save(userID: userID) }
-                    }
-                    .disabled(viewModel.isSaving)
-                }
-
-                Section("Blocked Users") {
-                    if viewModel.blockedUsers.isEmpty {
-                        Text("No blocked users").foregroundStyle(.secondary)
-                    } else {
-                        ForEach(viewModel.blockedUsers) { blockedUser in
+            Group {
+                if viewModel.isLoading {
+                    ProgressView()
+                } else {
+                    Form {
+                        Section {
                             HStack {
-                                Text(blockedUser.name)
                                 Spacer()
-                                Button("Unblock") {
-                                    Task { await viewModel.unblock(blockedID: blockedUser.id, blockerID: userID) }
+                                VStack(spacing: 8) {
+                                    AsyncImage(url: viewModel.signedPhotoURL) { phase in
+                                        if case .success(let image) = phase {
+                                            image.resizable().scaledToFill()
+                                        } else {
+                                            Image(systemName: "person.crop.circle.fill")
+                                                .resizable()
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .frame(width: 96, height: 96)
+                                    .clipShape(Circle())
+
+                                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                        Text(viewModel.isUploadingPhoto ? "Uploading..." : "Change Photo")
+                                    }
+                                    .disabled(viewModel.isUploadingPhoto)
+                                    .onChange(of: selectedPhoto) { _, newValue in
+                                        Task { await loadAndUploadPhoto(newValue) }
+                                    }
+                                }
+                                Spacer()
+                            }
+                        }
+
+                        Section("Your name") {
+                            TextField("Name", text: $viewModel.name)
+                        }
+
+                        Section("Your usual sizes") {
+                            TextField("Top", text: $viewModel.topSize)
+                            TextField("Bottom", text: $viewModel.bottomSize)
+                            TextField("Shoe", text: $viewModel.shoeSize)
+                        }
+
+                        if let errorMessage = viewModel.errorMessage {
+                            Section {
+                                Text(errorMessage).foregroundStyle(.red)
+                            }
+                        }
+
+                        Section {
+                            Button(viewModel.isSaving ? "Saving..." : "Save") {
+                                Task { await viewModel.save(userID: userID) }
+                            }
+                            .disabled(viewModel.isSaving || !viewModel.hasLoadedProfile)
+                        }
+
+                        Section("Blocked Users") {
+                            if viewModel.blockedUsers.isEmpty {
+                                Text("No blocked users").foregroundStyle(.secondary)
+                            } else {
+                                ForEach(viewModel.blockedUsers) { blockedUser in
+                                    HStack {
+                                        Text(blockedUser.name)
+                                        Spacer()
+                                        Button("Unblock") {
+                                            Task { await viewModel.unblock(blockedID: blockedUser.id, blockerID: userID) }
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
 
-                Section {
-                    Button("Sign Out") {
-                        Task { await onSignedOut() }
-                    }
-                }
+                        Section {
+                            Button("Sign Out") {
+                                Task { await onSignedOut() }
+                            }
+                        }
 
-                Section {
-                    Button("Delete Account", role: .destructive) {
-                        showingDeleteConfirmation = true
+                        Section {
+                            Button("Delete Account", role: .destructive) {
+                                showingDeleteConfirmation = true
+                            }
+                        }
                     }
                 }
             }
@@ -592,7 +612,10 @@ struct ProfileView: View {
     private func loadAndUploadPhoto(_ item: PhotosPickerItem?) async {
         guard let item else { return }
         guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data) else { return }
+              let image = UIImage(data: data) else {
+            viewModel.reportInvalidPhoto()
+            return
+        }
         await viewModel.uploadPhoto(image, userID: userID)
     }
 }
@@ -644,8 +667,8 @@ struct RootView: View {
                     ProgressView().task { await checkProfile(userID: userID) }
                 } else if hasProfile == true {
                     MainTabView(userID: userID, onSignedOut: {
-                        hasProfile = nil
                         try? await authViewModel.signOut()
+                        hasProfile = nil
                     })
                 } else {
                     OnboardingView(userID: userID) {
@@ -674,14 +697,27 @@ struct RootView: View {
 }
 ```
 
-Note: `hasProfile = nil` is reset **before** `signOut()` is awaited — this closes the staleness gap described in the design doc (§5): whichever user signs in next, on this device, always gets a fresh profile check rather than inheriting the previous session's cached result.
+Note: `hasProfile = nil` is reset **after** `signOut()` completes, not before. The final whole-plan review found that resetting it first re-enters the `hasProfile == nil` branch (firing `checkProfile`) *while `authViewModel.session` is still non-nil* — racing an unauthenticated profile check against the SDK's own session teardown (supabase-swift clears its local session before the network sign-out call completes). That race can land `hasProfile = false`, routing the very next sign-in through `OnboardingView`, whose upsert would silently overwrite the real profile's photo and sizes with blank defaults. Resetting after `signOut()` avoids the race entirely: once `session == nil`, `RootView` shows `SignInView`, which never reads `hasProfile`. See design doc §5 for the full trace.
 
-- [ ] **Step 4: Verify it builds**
+- [ ] **Step 4: Fix `AuthViewModel.signOut()` to always clear local session**
+
+Sign-out becomes reachable for the first time this phase, exposing a pre-existing bug: `signOut()` only clears `session` after `client.auth.signOut()` returns successfully, so a network failure (e.g. offline) leaves the app half-signed-out — `RootView` still thinks there's a session, but the next action may re-trigger a doomed network call. Modify `Closet/Closet/Auth/AuthViewModel.swift`'s `signOut()`:
+
+```swift
+    func signOut() async throws {
+        defer { session = nil }
+        try await client.auth.signOut()
+    }
+```
+
+`session = nil` now runs whether or not the network call throws, so `RootView` always reaches `SignInView` after a sign-out attempt. The rest of the file (`session`, `isLoading`, `init()`, `loadSession()`, `signInWithApple()`) is unchanged.
+
+- [ ] **Step 5: Verify it builds**
 
 Run: `xcodebuild -project Closet/Closet.xcodeproj -scheme Closet -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build`
 Expected: `** BUILD SUCCEEDED **`
 
-- [ ] **Step 5: Manually verify the full Profile flow**
+- [ ] **Step 6: Manually verify the full Profile flow**
 
 On a device or Simulator:
 
@@ -693,10 +729,10 @@ On a device or Simulator:
 6. Sign back in as the same user — confirm you land back in the app normally (not sent through Onboarding again).
 7. On a disposable test account you don't need: tap "Delete Account," confirm the dialog, confirm — confirm you're returned to the sign-in screen, and confirm (via the Supabase dashboard, or by trying to sign in again with that Apple ID) that the account and all its data are actually gone.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add Closet/Closet/Profile/ProfileViewModel.swift Closet/Closet/Profile/ProfileView.swift Closet/Closet/MainTabView.swift Closet/Closet/RootView.swift
+git add Closet/Closet/Profile/ProfileViewModel.swift Closet/Closet/Profile/ProfileView.swift Closet/Closet/MainTabView.swift Closet/Closet/RootView.swift Closet/Closet/Auth/AuthViewModel.swift
 git commit -m "Add Profile screen: edit profile, photo upload, blocked list, sign out, delete account"
 ```
 
