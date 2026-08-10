@@ -10,7 +10,8 @@ struct SignInView: View {
     var body: some View {
         VStack(spacing: 24) {
             Text("Closet")
-                .font(.largeTitle.bold())
+                .font(Theme.Font.headline(44))
+                .foregroundStyle(Theme.Color.primaryText)
 
             SignInWithAppleButton(.signIn) { request in
                 let nonce = randomNonceString()
@@ -26,10 +27,12 @@ struct SignInView: View {
 
             if let errorMessage {
                 Text(errorMessage)
+                    .font(Theme.Font.body(13))
                     .foregroundStyle(.red)
-                    .font(.footnote)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Color.background)
     }
 
     private func handle(_ result: Result<ASAuthorization, Error>) {
