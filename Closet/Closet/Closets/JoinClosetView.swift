@@ -8,15 +8,18 @@ struct JoinClosetView: View {
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Invite code", text: $viewModel.inviteCode)
-                    .font(Theme.Font.body(16))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(Theme.Font.body(14))
-                        .foregroundStyle(.red)
+                Section {
+                    TextField("Invite code", text: $viewModel.inviteCode)
+                        .font(Theme.Font.body(16))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(Theme.Font.body(14))
+                            .foregroundStyle(.red)
+                    }
                 }
+                .listRowBackground(Theme.Color.background)
             }
             .scrollContentBackground(.hidden)
             .background(Theme.Color.background)

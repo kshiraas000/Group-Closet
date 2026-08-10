@@ -41,13 +41,16 @@ struct CreateClosetView: View {
 
     private var form: some View {
         Form {
-            TextField("Closet name", text: $viewModel.name)
-                .font(Theme.Font.body(16))
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .font(Theme.Font.body(14))
-                    .foregroundStyle(.red)
+            Section {
+                TextField("Closet name", text: $viewModel.name)
+                    .font(Theme.Font.body(16))
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .font(Theme.Font.body(14))
+                        .foregroundStyle(.red)
+                }
             }
+            .listRowBackground(Theme.Color.background)
         }
         .scrollContentBackground(.hidden)
         .background(Theme.Color.background)

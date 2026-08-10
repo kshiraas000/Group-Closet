@@ -10,6 +10,9 @@ struct MainTabView: View {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(Theme.Color.background)
+        let labelFont = UIFont(name: "DMSans-Medium", size: 10) ?? UIFont.systemFont(ofSize: 10, weight: .medium)
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.font: labelFont]
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.font: labelFont]
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
