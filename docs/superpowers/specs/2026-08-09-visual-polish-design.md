@@ -76,7 +76,9 @@ Same `CategoryChipsRow` + `FilterSheet` pattern as Closet Detail, minus the Owne
 
 ### 5.4 Closets List (`ClosetsListView.swift`)
 
-Restyle only: closet rows get the theme's typography (closet name in Lora) instead of a bare `List` of plain text rows. `ClosetsViewModel` currently loads only `id`/`name`/`inviteCode`/`createdBy`/`createdAt` — no member list or item count — so the mockup's "Maya, Priya & Jules · 34 pieces" subtitle is **not** included here; adding it would mean a new per-closet query (member names + item count), which is a data/feature change, not a restyle. Deferred, not silently dropped: worth a future small enhancement once someone wants it, but out of scope for this pass.
+Restyle only: closet rows get the theme's typography (closet name in Lora) instead of a bare `List` of plain text rows. `ClosetsViewModel` currently loads only `id`/`name`/`inviteCode`/`createdBy`/`createdAt` — no member list or item count — so the mockup's "Maya, Priya & Jules · 34 pieces" subtitle is **not** included here; adding it would mean a new per-closet query, which is a data/feature change, not a restyle.
+
+**Concrete future idea (explicitly out of scope for this pass):** a tappable "N members" summary on each closet row (e.g. "5 members") that expands to show the full member list on tap — simpler than showing every name inline, and scales the same way the Filter sheet's Owner section does for large closets. Recorded here so it isn't lost, but not built now.
 
 ### 5.5 Add Item flow, Onboarding, Sign In, Create/Join Closet, Profile
 
