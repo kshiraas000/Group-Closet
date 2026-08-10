@@ -9,23 +9,31 @@ private struct ItemDetailContext: Identifiable {
 struct MyClothesView: View {
     @State private var viewModel = MyClothesViewModel()
     @State private var detailContext: ItemDetailContext?
+    @State private var showingFilters = false
     let userID: UUID
 
-    private let gridColumns = [GridItem(.adaptive(minimum: 110), spacing: 2)]
+    private let gridColumns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
         NavigationStack {
             List {
                 if viewModel.isLoading {
                     ProgressView()
+                        .listRowBackground(Theme.Color.background)
                 } else {
-                    filterChipsRow
+                    CategoryChipsRow(selectedCategory: $viewModel.filters.category) {
+                        showingFilters = true
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Theme.Color.background)
 
                     if viewModel.filteredItems.isEmpty {
                         Text(viewModel.items.isEmpty ? "No items yet" : "No items match your filters")
-                            .foregroundStyle(.secondary)
+                            .font(Theme.Font.body(14))
+                            .foregroundStyle(Theme.Color.secondaryText)
+                            .listRowBackground(Theme.Color.background)
                     } else {
-                        LazyVGrid(columns: gridColumns, spacing: 2) {
+                        LazyVGrid(columns: gridColumns, spacing: 10) {
                             ForEach(viewModel.filteredItems) { browseItem in
                                 Button {
                                     openDetail(for: browseItem)
@@ -35,14 +43,20 @@ struct MyClothesView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .listRowInsets(EdgeInsets())
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .listRowBackground(Theme.Color.background)
                     }
                 }
 
                 if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
+                    Text(errorMessage)
+                        .font(Theme.Font.body(14))
+                        .foregroundStyle(.red)
+                        .listRowBackground(Theme.Color.background)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.Color.background)
             .searchable(text: $viewModel.filters.searchText)
             .navigationTitle("My Clothes")
             .task {
@@ -50,6 +64,15 @@ struct MyClothesView: View {
             }
             .refreshable {
                 await viewModel.load(userID: userID)
+            }
+            .sheet(isPresented: $showingFilters) {
+                FilterSheet(
+                    filters: $viewModel.filters,
+                    members: nil,
+                    availableSizes: viewModel.availableSizes,
+                    availableColors: viewModel.availableColors,
+                    availableOccasions: viewModel.availableOccasions
+                )
             }
             .fullScreenCover(item: $detailContext) { context in
                 ItemDetailView(
@@ -69,75 +92,16 @@ struct MyClothesView: View {
         }
     }
 
-    private var filterChipsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Menu {
-                    Button("All Categories") { viewModel.filters.category = nil }
-                    ForEach(ItemCategory.allCases) { category in
-                        Button(category.rawValue) { viewModel.filters.category = category }
-                    }
-                } label: {
-                    chipLabel("Category", value: viewModel.filters.category?.rawValue)
-                }
-
-                if !viewModel.availableSizes.isEmpty {
-                    Menu {
-                        Button("Any Size") { viewModel.filters.size = nil }
-                        ForEach(viewModel.availableSizes, id: \.self) { size in
-                            Button(size) { viewModel.filters.size = size }
-                        }
-                    } label: {
-                        chipLabel("Size", value: viewModel.filters.size)
-                    }
-                }
-
-                if !viewModel.availableColors.isEmpty {
-                    Menu {
-                        Button("Any Color") { viewModel.filters.color = nil }
-                        ForEach(viewModel.availableColors, id: \.self) { color in
-                            Button(color) { viewModel.filters.color = color }
-                        }
-                    } label: {
-                        chipLabel("Color", value: viewModel.filters.color)
-                    }
-                }
-
-                if !viewModel.availableOccasions.isEmpty {
-                    Menu {
-                        Button("Any Occasion") { viewModel.filters.occasion = nil }
-                        ForEach(viewModel.availableOccasions, id: \.self) { occasion in
-                            Button(occasion) { viewModel.filters.occasion = occasion }
-                        }
-                    } label: {
-                        chipLabel("Occasion", value: viewModel.filters.occasion)
-                    }
-                }
-            }
-        }
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-    }
-
-    private func chipLabel(_ title: String, value: String?) -> some View {
-        Text(value ?? title)
-            .font(.footnote)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(value == nil ? Color.secondary.opacity(0.15) : Color.blue.opacity(0.2))
-            .clipShape(Capsule())
-    }
-
     private func itemCell(_ browseItem: BrowseItem) -> some View {
         AsyncImage(url: browseItem.signedURL) { phase in
             if case .success(let image) = phase {
                 image.resizable().scaledToFill()
             } else {
                 Rectangle()
-                    .fill(.secondary.opacity(0.2))
-                    .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
+                    .fill(Theme.Color.accent.opacity(0.12))
             }
         }
-        .frame(height: 110)
-        .clipped()
+        .aspectRatio(3 / 4, contentMode: .fill)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
