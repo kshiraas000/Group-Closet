@@ -124,6 +124,7 @@ struct ClosetDetailView: View {
                 items: context.items,
                 startIndex: context.startIndex,
                 members: viewModel.members,
+                memberPhotoURLs: viewModel.memberPhotoURLs,
                 userID: userID,
                 onShareChanged: { Task { await viewModel.load(closetID: closet.id) } },
                 onBlocked: { Task { await viewModel.load(closetID: closet.id) } }

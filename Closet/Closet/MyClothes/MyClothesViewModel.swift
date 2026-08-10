@@ -36,6 +36,7 @@ private struct RawItem: Decodable {
 @Observable
 final class MyClothesViewModel {
     var myProfile: UserProfile?
+    var memberPhotoURLs: [UUID: URL] = [:]
     var items: [BrowseItem] = []
     var filters = BrowseFilters()
     var isLoading = true
@@ -70,6 +71,7 @@ final class MyClothesViewModel {
             .single()
             .execute()
             .value
+        memberPhotoURLs = await ProfilePhotoResolver.signedURLs(for: [myProfile].compactMap { $0 })
 
         do {
             let rows: [RawItem] = try await client

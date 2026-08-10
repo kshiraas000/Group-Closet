@@ -10,13 +10,23 @@ struct ItemDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let items: [BrowseItem]
     let members: [UserProfile]
+    let memberPhotoURLs: [UUID: URL]
     let userID: UUID
     let onShareChanged: () -> Void
     let onBlocked: () -> Void
 
-    init(items: [BrowseItem], startIndex: Int, members: [UserProfile], userID: UUID, onShareChanged: @escaping () -> Void = {}, onBlocked: @escaping () -> Void = {}) {
+    init(
+        items: [BrowseItem],
+        startIndex: Int,
+        members: [UserProfile],
+        memberPhotoURLs: [UUID: URL] = [:],
+        userID: UUID,
+        onShareChanged: @escaping () -> Void = {},
+        onBlocked: @escaping () -> Void = {}
+    ) {
         self.items = items
         self.members = members
+        self.memberPhotoURLs = memberPhotoURLs
         self.userID = userID
         self.onShareChanged = onShareChanged
         self.onBlocked = onBlocked
@@ -27,8 +37,12 @@ struct ItemDetailView: View {
         items[currentIndex]
     }
 
+    private var owner: UserProfile? {
+        members.first { $0.id == currentItem.item.ownerID }
+    }
+
     private var ownerName: String {
-        members.first { $0.id == currentItem.item.ownerID }?.name ?? "Unknown"
+        owner?.name ?? "Unknown"
     }
 
     private var isOwner: Bool {
@@ -41,8 +55,7 @@ struct ItemDetailView: View {
             photoArea
             bottomInfo
         }
-        .background(Color.black)
-        .preferredColorScheme(.dark)
+        .background(Theme.Color.background)
         .task(id: currentIndex) {
             await viewModel.loadFullResURL(for: currentItem)
             if isOwner {
@@ -84,14 +97,14 @@ struct ItemDetailView: View {
     private var topBar: some View {
         HStack(alignment: .top) {
             HStack(spacing: 8) {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
+                OwnerBadge(profile: owner, signedURL: memberPhotoURLs[currentItem.item.ownerID], diameter: 34)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ownerName).bold()
+                    Text(ownerName)
+                        .font(Theme.Font.body(15, weight: .medium))
+                        .foregroundStyle(Theme.Color.primaryText)
                     Text(currentItem.item.category.rawValue)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(Theme.Font.body(12))
+                        .foregroundStyle(Theme.Color.secondaryText)
                 }
             }
 
@@ -102,10 +115,11 @@ struct ItemDetailView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
+                        .foregroundStyle(Theme.Color.secondaryText)
                 }
                 Text("\(currentIndex + 1) of \(items.count)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Font.body(12))
+                    .foregroundStyle(Theme.Color.tertiaryText)
             }
         }
         .padding()
@@ -118,11 +132,12 @@ struct ItemDetailView: View {
                     image.resizable().scaledToFit()
                 } else {
                     Rectangle()
-                        .fill(.secondary.opacity(0.2))
-                        .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
+                        .fill(Theme.Color.accent.opacity(0.08))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .padding(.horizontal, 16)
 
             HStack(spacing: 0) {
                 Color.clear
@@ -139,9 +154,11 @@ struct ItemDetailView: View {
     }
 
     private var bottomInfo: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             if let caption = currentItem.item.caption {
-                Text(caption).bold()
+                Text(caption)
+                    .font(Theme.Font.headline(24))
+                    .foregroundStyle(Theme.Color.primaryText)
             }
 
             let chips = [currentItem.item.size, currentItem.item.color]
@@ -149,11 +166,12 @@ struct ItemDetailView: View {
                 + currentItem.item.occasionTags
             if !chips.isEmpty {
                 Text(chips.joined(separator: " · "))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Font.body(13))
+                    .foregroundStyle(Theme.Color.secondaryText)
             }
 
             if isOwner {
+                Divider().overlay(Theme.Color.divider).padding(.top, 8)
                 sharedToSection
             }
         }
@@ -166,10 +184,14 @@ struct ItemDetailView: View {
 
     private var sharedToSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Shared to").font(.footnote).foregroundStyle(.secondary)
+            Text("Shared to")
+                .font(Theme.Font.body(12))
+                .foregroundStyle(Theme.Color.secondaryText)
 
             if let shareStateErrorMessage = viewModel.shareStateErrorMessage {
-                Text(shareStateErrorMessage).font(.footnote).foregroundStyle(.red)
+                Text(shareStateErrorMessage)
+                    .font(Theme.Font.body(12))
+                    .foregroundStyle(.red)
             }
 
             if viewModel.isLoadingShareState {
@@ -184,13 +206,15 @@ struct ItemDetailView: View {
                     } label: {
                         HStack {
                             Text(closet.name)
+                                .font(Theme.Font.body(15))
                             Spacer()
                             if viewModel.sharedClosetIDs.contains(closet.id) {
                                 Image(systemName: "checkmark")
+                                    .foregroundStyle(Theme.Color.accent)
                             }
                         }
                     }
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Theme.Color.primaryText)
                 }
             }
         }
@@ -211,6 +235,7 @@ struct ItemDetailView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.title2)
+                .foregroundStyle(Theme.Color.secondaryText)
         }
         .padding()
     }

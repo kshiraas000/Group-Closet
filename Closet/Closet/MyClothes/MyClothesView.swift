@@ -79,6 +79,7 @@ struct MyClothesView: View {
                     items: context.items,
                     startIndex: context.startIndex,
                     members: [viewModel.myProfile].compactMap { $0 },
+                    memberPhotoURLs: viewModel.memberPhotoURLs,
                     userID: userID
                 )
             }
