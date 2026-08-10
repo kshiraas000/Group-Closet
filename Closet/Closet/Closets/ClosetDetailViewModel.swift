@@ -44,6 +44,7 @@ private struct ItemShareRow: Decodable {
 @Observable
 final class ClosetDetailViewModel {
     var members: [UserProfile] = []
+    var memberPhotoURLs: [UUID: URL] = [:]
     var items: [BrowseItem] = []
     var filters = BrowseFilters()
     var isLoading = true
@@ -80,6 +81,7 @@ final class ClosetDetailViewModel {
                 .execute()
                 .value
             members = rows.map(\.users)
+            memberPhotoURLs = await ProfilePhotoResolver.signedURLs(for: members)
         } catch {
             failures.append(error.localizedDescription)
         }
