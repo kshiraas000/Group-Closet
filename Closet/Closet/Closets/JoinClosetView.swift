@@ -9,12 +9,17 @@ struct JoinClosetView: View {
         NavigationStack {
             Form {
                 TextField("Invite code", text: $viewModel.inviteCode)
+                    .font(Theme.Font.body(16))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
+                    Text(errorMessage)
+                        .font(Theme.Font.body(14))
+                        .foregroundStyle(.red)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.Color.background)
             .navigationTitle("Join a Closet")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -30,6 +35,7 @@ struct JoinClosetView: View {
                         }
                     }
                     .disabled(viewModel.isJoining)
+                    .tint(Theme.Color.accent)
                 }
             }
         }

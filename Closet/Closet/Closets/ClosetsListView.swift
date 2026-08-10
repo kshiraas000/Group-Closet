@@ -12,19 +12,29 @@ struct ClosetsListView: View {
                 if viewModel.isLoading {
                     ProgressView()
                 } else if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
+                    Text(errorMessage)
+                        .font(Theme.Font.body(14))
+                        .foregroundStyle(.red)
                 } else if viewModel.closets.isEmpty {
                     emptyState
                 } else {
                     List(viewModel.closets) { closet in
-                        NavigationLink(closet.name) {
+                        NavigationLink {
                             ClosetDetailView(closet: closet, userID: userID) {
                                 Task { await viewModel.loadClosets() }
                             }
+                        } label: {
+                            Text(closet.name)
+                                .font(Theme.Font.headline(20))
+                                .foregroundStyle(Theme.Color.primaryText)
                         }
+                        .listRowBackground(Theme.Color.background)
                     }
+                    .scrollContentBackground(.hidden)
+                    .background(Theme.Color.background)
                 }
             }
+            .background(Theme.Color.background)
             .navigationTitle("Closets")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -34,6 +44,7 @@ struct ClosetsListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .tint(Theme.Color.accent)
                 }
             }
             .task { await viewModel.loadClosets() }
@@ -53,9 +64,14 @@ struct ClosetsListView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Text("No Closets yet")
-                .font(.headline)
+                .font(Theme.Font.headline(22))
+                .foregroundStyle(Theme.Color.primaryText)
             Button("Create a Closet") { showingCreate = true }
+                .font(Theme.Font.body(16, weight: .medium))
+                .foregroundStyle(Theme.Color.accent)
             Button("Have an invite link? Paste it") { showingJoin = true }
+                .font(Theme.Font.body(16))
+                .foregroundStyle(Theme.Color.accent)
         }
     }
 }

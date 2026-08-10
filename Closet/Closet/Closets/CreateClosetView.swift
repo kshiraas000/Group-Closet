@@ -15,6 +15,7 @@ struct CreateClosetView: View {
                     form
                 }
             }
+            .background(Theme.Color.background)
             .navigationTitle(createdCloset == nil ? "New Closet" : "Invite Friends")
             .toolbar {
                 if createdCloset == nil {
@@ -31,6 +32,7 @@ struct CreateClosetView: View {
                             }
                         }
                         .disabled(viewModel.isSaving)
+                        .tint(Theme.Color.accent)
                     }
                 }
             }
@@ -40,20 +42,31 @@ struct CreateClosetView: View {
     private var form: some View {
         Form {
             TextField("Closet name", text: $viewModel.name)
+                .font(Theme.Font.body(16))
             if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage).foregroundStyle(.red)
+                Text(errorMessage)
+                    .font(Theme.Font.body(14))
+                    .foregroundStyle(.red)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.background)
     }
 
     private func inviteView(for closet: Closet) -> some View {
         VStack(spacing: 16) {
             Text("\(closet.name) is ready")
-                .font(.headline)
+                .font(Theme.Font.headline(22))
+                .foregroundStyle(Theme.Color.primaryText)
             Text("Invite code: \(closet.inviteCode)")
-                .font(.title2.monospaced())
+                .font(Theme.Font.body(18, weight: .medium))
+                .foregroundStyle(Theme.Color.secondaryText)
             ShareLink(item: "Join my Closet \"\(closet.name)\" on the Closet app — invite code: \(closet.inviteCode)")
+                .font(Theme.Font.body(16, weight: .medium))
+                .foregroundStyle(Theme.Color.accent)
             Button("Done") { dismiss() }
+                .font(Theme.Font.body(16, weight: .medium))
+                .foregroundStyle(Theme.Color.accent)
         }
         .padding()
     }
