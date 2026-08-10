@@ -14,6 +14,7 @@ struct PhotoTaggingView: View {
                 }
             }
             .tabViewStyle(.page)
+            .background(Theme.Color.background)
 
             Button(currentIndex == viewModel.draftItems.count - 1 ? "Continue" : "Next") {
                 if currentIndex < viewModel.draftItems.count - 1 {
@@ -22,9 +23,12 @@ struct PhotoTaggingView: View {
                     onFinished()
                 }
             }
+            .font(Theme.Font.body(16, weight: .medium))
             .disabled(!viewModel.draftItems.indices.contains(currentIndex) || viewModel.draftItems[currentIndex].category == nil)
+            .tint(Theme.Color.accent)
             .padding()
         }
+        .background(Theme.Color.background)
     }
 
     private func tagForm(index: Int) -> some View {
@@ -34,16 +38,20 @@ struct PhotoTaggingView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                Text("Category").font(.headline)
+                Text("Category")
+                    .font(Theme.Font.body(15, weight: .medium))
+                    .foregroundStyle(Theme.Color.primaryText)
                 let columns = [GridItem(.adaptive(minimum: 90))]
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(ItemCategory.allCases) { category in
                         Button(category.rawValue) {
                             viewModel.selectCategory(category, forItemAt: index)
                         }
+                        .font(Theme.Font.body(14))
                         .buttonStyle(.bordered)
-                        .tint(viewModel.draftItems[index].category == category ? .blue : .gray)
+                        .tint(viewModel.draftItems[index].category == category ? Theme.Color.accent : Theme.Color.tertiaryText)
                     }
                 }
 
@@ -59,8 +67,12 @@ struct PhotoTaggingView: View {
                             .textFieldStyle(.roundedBorder)
                     }
                 }
+                .font(Theme.Font.body(15))
+                .foregroundStyle(Theme.Color.primaryText)
+                .tint(Theme.Color.accent)
             }
             .padding()
         }
+        .background(Theme.Color.background)
     }
 }

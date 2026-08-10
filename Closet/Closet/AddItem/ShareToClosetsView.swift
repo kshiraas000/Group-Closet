@@ -26,9 +26,13 @@ struct ShareToClosetsView: View {
                     if isLoadingClosets {
                         ProgressView()
                     } else if let closetsErrorMessage {
-                        Text(closetsErrorMessage).foregroundStyle(.red)
+                        Text(closetsErrorMessage)
+                            .font(Theme.Font.body(14))
+                            .foregroundStyle(.red)
                     } else if otherClosets.isEmpty {
-                        Text("You're not in any other Closets").foregroundStyle(.secondary)
+                        Text("You're not in any other Closets")
+                            .font(Theme.Font.body(14))
+                            .foregroundStyle(Theme.Color.secondaryText)
                     } else {
                         ForEach(otherClosets) { closet in
                             Button {
@@ -36,39 +40,52 @@ struct ShareToClosetsView: View {
                             } label: {
                                 HStack {
                                     Text(closet.name)
+                                        .font(Theme.Font.body(16))
                                     Spacer()
                                     if viewModel.shareToClosetIDs.contains(closet.id) {
                                         Image(systemName: "checkmark")
+                                            .foregroundStyle(Theme.Color.accent)
                                     }
                                 }
                             }
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Theme.Color.primaryText)
                         }
                     }
                 }
+                .listRowBackground(Theme.Color.background)
 
                 Section("Items") {
                     ForEach(Array(viewModel.draftItems.enumerated()), id: \.element.id) { index, draft in
                         HStack {
                             Text(draft.category?.rawValue ?? "Untagged")
+                                .font(Theme.Font.body(16))
+                                .foregroundStyle(Theme.Color.primaryText)
                             Spacer()
                             itemStatusView(index: index, state: draft.saveState)
                         }
                     }
                 }
+                .listRowBackground(Theme.Color.background)
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.Color.background)
 
             if allSaved {
                 Button("Done") { onDone() }
+                    .font(Theme.Font.body(16, weight: .medium))
+                    .tint(Theme.Color.accent)
                     .padding()
             } else {
                 Button(isSaving ? "Saving..." : "Save") {
                     Task { await viewModel.saveAll(currentClosetID: currentClosetID, ownerID: ownerID) }
                 }
+                .font(Theme.Font.body(16, weight: .medium))
                 .disabled(isSaving)
+                .tint(Theme.Color.accent)
                 .padding()
             }
         }
+        .background(Theme.Color.background)
         .task { await loadOtherClosets() }
     }
 
@@ -101,6 +118,7 @@ struct ShareToClosetsView: View {
         switch state {
         case .pending:
             Image(systemName: "circle")
+                .foregroundStyle(Theme.Color.tertiaryText)
         case .saving:
             ProgressView()
         case .saved:

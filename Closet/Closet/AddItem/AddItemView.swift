@@ -37,6 +37,7 @@ struct AddItemView: View {
                     }
                 }
             }
+            .background(Theme.Color.background)
             .navigationTitle("Add Items")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -51,7 +52,9 @@ struct AddItemView: View {
         VStack(spacing: 24) {
             PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 20, matching: .images) {
                 Label("Choose from Library", systemImage: "photo.on.rectangle")
+                    .font(Theme.Font.body(16, weight: .medium))
             }
+            .tint(Theme.Color.accent)
             .onChange(of: selectedPhotos) { _, newValue in
                 Task { await loadImages(from: newValue) }
             }
