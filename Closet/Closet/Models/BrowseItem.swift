@@ -8,7 +8,8 @@ struct BrowseItem: Identifiable {
 }
 
 struct BrowseFilters: Equatable {
-    var category: ItemCategory?
+    /// Empty means "all categories" — otherwise an item matches if it's in the set.
+    var categories: Set<ItemCategory> = []
     var ownerID: UUID?
     var size: String?
     var color: String?
@@ -19,7 +20,7 @@ struct BrowseFilters: Equatable {
 enum BrowseFiltering {
     static func filteredItems(_ items: [BrowseItem], filters: BrowseFilters) -> [BrowseItem] {
         items.filter { browseItem in
-            if let category = filters.category, browseItem.item.category != category {
+            if !filters.categories.isEmpty, !filters.categories.contains(browseItem.item.category) {
                 return false
             }
             if let ownerID = filters.ownerID, browseItem.item.ownerID != ownerID {

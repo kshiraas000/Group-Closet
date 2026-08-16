@@ -46,9 +46,18 @@ final class AddItemViewModel {
         draftItems = images.map { DraftItem(image: $0) }
     }
 
+    func addImages(_ images: [UIImage]) {
+        draftItems.append(contentsOf: images.map { DraftItem(image: $0) })
+    }
+
     func selectCategory(_ category: ItemCategory, forItemAt index: Int) {
+        let previousDefault = draftItems[index].category.map { defaultSize(for: $0) } ?? ""
+        let currentSize = draftItems[index].size
         draftItems[index].category = category
-        if draftItems[index].size.isEmpty {
+        // Only refill the size if it still matches the prior category's
+        // auto-fill (or is empty) — otherwise a manually typed size would
+        // get silently clobbered by switching categories.
+        if currentSize.isEmpty || currentSize == previousDefault {
             draftItems[index].size = defaultSize(for: category)
         }
     }
@@ -102,11 +111,11 @@ final class AddItemViewModel {
                 .filter { !$0.isEmpty }
 
             // save() can be re-invoked on the same itemID via the retry button
-            // after a partial prior failure. authenticated only has SELECT+INSERT
-            // on these tables (no UPDATE — edit/delete is a later phase), so
-            // idempotency comes from checking whether each row already exists
-            // before inserting it, not from ON CONFLICT DO UPDATE (which needs
-            // UPDATE privilege Postgres enforces even when nothing would change).
+            // after a partial prior failure. item_photos/item_shares only grant
+            // SELECT+INSERT to authenticated, so idempotency comes from checking
+            // whether each row already exists before inserting it, not from
+            // ON CONFLICT DO UPDATE (which needs UPDATE privilege Postgres
+            // enforces even when nothing would change).
             if try await !rowExists(table: "items", column: "id", value: itemID) {
                 let newItem = NewItem(
                     id: itemID,

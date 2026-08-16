@@ -4,9 +4,12 @@ import SwiftUI
 struct AddItemView: View {
     @State private var viewModel = AddItemViewModel()
     @State private var step: Step = .picking
+    @State private var taggingStartIndex = 0
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var showingCamera = false
     @Environment(\.dismiss) private var dismiss
     let closetID: UUID
+    let closetName: String
     let userID: UUID
     let onItemsSaved: () -> Void
 
@@ -17,35 +20,68 @@ struct AddItemView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                switch step {
-                case .picking:
+        Group {
+            switch step {
+            case .picking:
+                VStack(spacing: 0) {
+                    header
                     pickerView
-                case .tagging:
-                    PhotoTaggingView(viewModel: viewModel) {
-                        step = .sharing
-                    }
-                case .sharing:
-                    ShareToClosetsView(
-                        viewModel: viewModel,
-                        currentClosetID: closetID,
-                        ownerID: userID
-                    ) {
+                }
+            case .tagging:
+                PhotoTaggingView(
+                    viewModel: viewModel,
+                    startIndex: taggingStartIndex,
+                    onCancel: { dismiss() },
+                    onFinished: { step = .sharing }
+                )
+            case .sharing:
+                ShareToClosetsView(
+                    viewModel: viewModel,
+                    currentClosetID: closetID,
+                    currentClosetName: closetName,
+                    ownerID: userID,
+                    onBack: {
+                        taggingStartIndex = 0
+                        step = .tagging
+                    },
+                    onEditPiece: { index in
+                        taggingStartIndex = index
+                        step = .tagging
+                    },
+                    onDone: {
                         onItemsSaved()
                         dismiss()
                     }
-                }
-            }
-            .background(Theme.Color.background)
-            .navigationTitle("Add Items")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
+                )
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Color.background)
         .task { await viewModel.loadDefaultSizes(userID: userID) }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraPicker { image in
+                viewModel.startTagging(images: [image])
+                step = .tagging
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .font(Theme.Font.body(15))
+                    .foregroundStyle(Theme.Color.accent)
+                Spacer()
+            }
+            Text("Add Items")
+                .font(Theme.Font.headline(32))
+                .foregroundStyle(Theme.Color.primaryText)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 4)
     }
 
     private var pickerView: some View {
@@ -58,8 +94,18 @@ struct AddItemView: View {
             .onChange(of: selectedPhotos) { _, newValue in
                 Task { await loadImages(from: newValue) }
             }
+
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button {
+                    showingCamera = true
+                } label: {
+                    Label("Take Photo", systemImage: "camera")
+                        .font(Theme.Font.body(16, weight: .medium))
+                }
+                .tint(Theme.Color.accent)
+            }
         }
-        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func loadImages(from items: [PhotosPickerItem]) async {

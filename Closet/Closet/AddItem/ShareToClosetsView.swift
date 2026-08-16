@@ -8,11 +8,14 @@ struct ShareToClosetsView: View {
     @State private var isLoadingClosets = true
     @State private var closetsErrorMessage: String?
     let currentClosetID: UUID
+    let currentClosetName: String
     let ownerID: UUID
+    let onBack: () -> Void
+    let onEditPiece: (Int) -> Void
     let onDone: () -> Void
 
-    private var isSaving: Bool {
-        viewModel.draftItems.contains { $0.saveState == .saving }
+    private var hasStartedSaving: Bool {
+        viewModel.draftItems.contains { $0.saveState != .pending }
     }
 
     private var allSaved: Bool {
@@ -20,73 +23,191 @@ struct ShareToClosetsView: View {
     }
 
     var body: some View {
-        VStack {
-            List {
-                Section("Also share to") {
-                    if isLoadingClosets {
-                        ProgressView()
-                    } else if let closetsErrorMessage {
-                        Text(closetsErrorMessage)
-                            .font(Theme.Font.body(14))
-                            .foregroundStyle(.red)
-                    } else if otherClosets.isEmpty {
-                        Text("You're not in any other Closets")
-                            .font(Theme.Font.body(14))
-                            .foregroundStyle(Theme.Color.secondaryText)
-                    } else {
-                        ForEach(otherClosets) { closet in
-                            Button {
-                                toggle(closet.id)
-                            } label: {
-                                HStack {
-                                    Text(closet.name)
-                                        .font(Theme.Font.body(16))
-                                    Spacer()
-                                    if viewModel.shareToClosetIDs.contains(closet.id) {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(Theme.Color.accent)
+        VStack(spacing: 0) {
+            headerRow
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    if !hasStartedSaving {
+                        VStack(alignment: .leading, spacing: 8) {
+                            sectionLabel("Also share to")
+                            card {
+                                if isLoadingClosets {
+                                    ProgressView()
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 13)
+                                } else if let closetsErrorMessage {
+                                    Text(closetsErrorMessage)
+                                        .font(Theme.Font.body(14))
+                                        .foregroundStyle(.red)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 13)
+                                } else if otherClosets.isEmpty {
+                                    Text("You're not in any other Closets")
+                                        .font(Theme.Font.body(14))
+                                        .foregroundStyle(Theme.Color.secondaryText)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 13)
+                                } else {
+                                    ForEach(Array(otherClosets.enumerated()), id: \.element.id) { index, closet in
+                                        if index > 0 {
+                                            Divider().overlay(Theme.Color.divider)
+                                        }
+                                        Button {
+                                            toggle(closet.id)
+                                        } label: {
+                                            HStack {
+                                                Text(closet.name)
+                                                    .font(Theme.Font.body(16))
+                                                    .foregroundStyle(Theme.Color.primaryText)
+                                                Spacer()
+                                                if viewModel.shareToClosetIDs.contains(closet.id) {
+                                                    Image(systemName: "checkmark")
+                                                        .foregroundStyle(Theme.Color.accent)
+                                                }
+                                            }
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 13)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
                             }
-                            .foregroundStyle(Theme.Color.primaryText)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabel("Pieces")
+                        card {
+                            ForEach(Array(viewModel.draftItems.enumerated()), id: \.element.id) { index, draft in
+                                if index > 0 {
+                                    Divider().overlay(Theme.Color.divider)
+                                }
+                                pieceRow(index: index, draft: draft)
+                            }
                         }
                     }
                 }
-                .listRowBackground(Theme.Color.background)
-
-                Section("Items") {
-                    ForEach(Array(viewModel.draftItems.enumerated()), id: \.element.id) { index, draft in
-                        HStack {
-                            Text(draft.category?.rawValue ?? "Untagged")
-                                .font(Theme.Font.body(16))
-                                .foregroundStyle(Theme.Color.primaryText)
-                            Spacer()
-                            itemStatusView(index: index, state: draft.saveState)
-                        }
-                    }
-                }
-                .listRowBackground(Theme.Color.background)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
             }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.background)
 
-            if allSaved {
-                Button("Done") { onDone() }
-                    .font(Theme.Font.body(16, weight: .medium))
-                    .tint(Theme.Color.accent)
-                    .padding()
-            } else {
-                Button(isSaving ? "Saving..." : "Save") {
-                    Task { await viewModel.saveAll(currentClosetID: currentClosetID, ownerID: ownerID) }
-                }
-                .font(Theme.Font.body(16, weight: .medium))
-                .disabled(isSaving)
-                .tint(Theme.Color.accent)
-                .padding()
-            }
+            bottomBar
         }
         .background(Theme.Color.background)
         .task { await loadOtherClosets() }
+    }
+
+    private var headerRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button {
+                    onBack()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Back")
+                    }
+                }
+                .font(Theme.Font.body(15))
+                .foregroundStyle(Theme.Color.accent)
+                .disabled(hasStartedSaving)
+                .opacity(hasStartedSaving ? 0.4 : 1)
+                Spacer()
+                if !hasStartedSaving {
+                    Text("Step 2 of 2")
+                        .font(Theme.Font.body(13))
+                        .foregroundStyle(Theme.Color.tertiaryText)
+                } else if !allSaved {
+                    Button("Close") { onDone() }
+                        .font(Theme.Font.body(15))
+                        .foregroundStyle(Theme.Color.accent)
+                }
+            }
+            Text(hasStartedSaving ? "Saving..." : "Review & save")
+                .font(Theme.Font.headline(28))
+                .foregroundStyle(Theme.Color.primaryText)
+            if !hasStartedSaving {
+                Text("\(viewModel.draftItems.count) piece\(viewModel.draftItems.count == 1 ? "" : "s") going into \(currentClosetName)")
+                    .font(Theme.Font.body(13))
+                    .foregroundStyle(Theme.Color.secondaryText)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private func pieceRow(index: Int, draft: DraftItem) -> some View {
+        HStack(spacing: 12) {
+            Image(uiImage: draft.image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(draft.caption.isEmpty ? "Untitled piece" : draft.caption)
+                    .font(Theme.Font.body(16))
+                    .foregroundStyle(Theme.Color.primaryText)
+                if let category = draft.category {
+                    let details = [category.rawValue, draft.size, draft.color]
+                        .filter { !$0.isEmpty }
+                    Text(details.joined(separator: " · "))
+                        .font(Theme.Font.body(12))
+                        .foregroundStyle(Theme.Color.secondaryText)
+                } else {
+                    Text("Needs a category")
+                        .font(Theme.Font.body(12))
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Spacer()
+
+            if hasStartedSaving {
+                itemStatusView(index: index, state: draft.saveState)
+            } else if draft.category == nil {
+                Button("Fix") { onEditPiece(index) }
+                    .font(Theme.Font.body(14, weight: .medium))
+                    .foregroundStyle(.red)
+            } else {
+                Button("Edit") { onEditPiece(index) }
+                    .font(Theme.Font.body(14, weight: .medium))
+                    .foregroundStyle(Theme.Color.accent)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    private var bottomBar: some View {
+        Group {
+            if allSaved {
+                Button("View in closet") { onDone() }
+                    .font(Theme.Font.body(16, weight: .medium))
+                    .foregroundStyle(Theme.Color.background)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.Color.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else if !hasStartedSaving {
+                Button("Save \(viewModel.draftItems.count) piece\(viewModel.draftItems.count == 1 ? "" : "s")") {
+                    Task { await viewModel.saveAll(currentClosetID: currentClosetID, ownerID: ownerID) }
+                }
+                .font(Theme.Font.body(16, weight: .medium))
+                .foregroundStyle(Theme.Color.background)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Theme.Color.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
     }
 
     private func toggle(_ closetID: UUID) {
@@ -113,6 +234,21 @@ struct ShareToClosetsView: View {
         }
     }
 
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(Theme.Font.body(12, weight: .medium))
+            .foregroundStyle(Theme.Color.secondaryText)
+            .tracking(0.4)
+    }
+
+    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            content()
+        }
+        .background(Theme.Color.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
     @ViewBuilder
     private func itemStatusView(index: Int, state: SaveState) -> some View {
         switch state {
@@ -122,7 +258,12 @@ struct ShareToClosetsView: View {
         case .saving:
             ProgressView()
         case .saved:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Theme.Color.accent)
+        case .failed(let message) where message == "Missing category":
+            Button("Fix") { onEditPiece(index) }
+                .font(Theme.Font.body(14, weight: .medium))
+                .foregroundStyle(.red)
         case .failed(let message):
             Button {
                 Task { await viewModel.save(itemAt: index, currentClosetID: currentClosetID, ownerID: ownerID) }

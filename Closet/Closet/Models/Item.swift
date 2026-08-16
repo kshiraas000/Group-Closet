@@ -9,6 +9,17 @@ enum ItemCategory: String, Codable, CaseIterable, Identifiable {
     case accessory = "Accessory"
 
     var id: String { rawValue }
+
+    var pluralLabel: String {
+        switch self {
+        case .top: return "Tops"
+        case .bottom: return "Bottoms"
+        case .dress: return "Dresses"
+        case .outerwear: return "Outerwear"
+        case .shoes: return "Shoes"
+        case .accessory: return "Accessories"
+        }
+    }
 }
 
 struct Item: Codable, Identifiable {
