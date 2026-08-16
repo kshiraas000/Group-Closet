@@ -6,6 +6,12 @@
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>SUPABASE_URL</key>
 	<string>$(SUPABASE_URL)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Group Closet</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Group Closet uses your camera to take photos of your clothes.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Lora-Regular.ttf</string>
@@ -14,7 +20,5 @@
 		<string>DMSans-Medium.ttf</string>
 		<string>DMSans-Bold.ttf</string>
 	</array>
-	<key>UIUserInterfaceStyle</key>
-	<string>Light</string>
 </dict>
 </plist>
