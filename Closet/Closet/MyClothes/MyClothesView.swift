@@ -12,28 +12,44 @@ struct MyClothesView: View {
     @State private var showingFilters = false
     let userID: UUID
 
-    private let gridColumns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2)
+    ]
 
     var body: some View {
         NavigationStack {
-            List {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .listRowBackground(Theme.Color.background)
-                } else {
-                    CategoryChipsRow(selectedCategory: $viewModel.filters.category) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+
+                    SearchField(text: $viewModel.filters.searchText, placeholder: "Search your clothes")
+
+                    CategoryChipsRow(selectedCategories: $viewModel.filters.categories) {
                         showingFilters = true
                     }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Theme.Color.background)
 
-                    if viewModel.filteredItems.isEmpty {
+                    ActiveFiltersRow(filters: $viewModel.filters, ownerName: nil)
+
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(Theme.Font.body(14))
+                            .foregroundStyle(.red)
+                    }
+
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else if viewModel.filteredItems.isEmpty {
                         Text(viewModel.items.isEmpty ? "No items yet" : "No items match your filters")
                             .font(Theme.Font.body(14))
                             .foregroundStyle(Theme.Color.secondaryText)
-                            .listRowBackground(Theme.Color.background)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
                     } else {
-                        LazyVGrid(columns: gridColumns, spacing: 10) {
+                        LazyVGrid(columns: gridColumns, spacing: 2) {
                             ForEach(viewModel.filteredItems) { browseItem in
                                 Button {
                                     openDetail(for: browseItem)
@@ -43,22 +59,14 @@ struct MyClothesView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                        .listRowBackground(Theme.Color.background)
                     }
                 }
-
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(Theme.Font.body(14))
-                        .foregroundStyle(.red)
-                        .listRowBackground(Theme.Color.background)
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
             }
-            .scrollContentBackground(.hidden)
             .background(Theme.Color.background)
-            .searchable(text: $viewModel.filters.searchText)
-            .navigationTitle("My Clothes")
+            .toolbar(.hidden, for: .navigationBar)
             .task {
                 await viewModel.load(userID: userID)
             }
@@ -80,8 +88,24 @@ struct MyClothesView: View {
                     startIndex: context.startIndex,
                     members: [viewModel.myProfile].compactMap { $0 },
                     memberPhotoURLs: viewModel.memberPhotoURLs,
-                    userID: userID
+                    userID: userID,
+                    onItemChanged: { Task { await viewModel.load(userID: userID) } }
                 )
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("My Clothes")
+                .font(Theme.Font.headline(32))
+                .foregroundStyle(Theme.Color.primaryText)
+
+            if !viewModel.isLoading {
+                let count = viewModel.items.count
+                Text("\(count) piece\(count == 1 ? "" : "s")")
+                    .font(Theme.Font.body(12.5))
+                    .foregroundStyle(Theme.Color.secondaryText)
             }
         }
     }
@@ -102,7 +126,7 @@ struct MyClothesView: View {
                     .fill(Theme.Color.accent.opacity(0.12))
             }
         }
-        .aspectRatio(3 / 4, contentMode: .fill)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .aspectRatio(1, contentMode: .fill)
+        .clipShape(Rectangle())
     }
 }

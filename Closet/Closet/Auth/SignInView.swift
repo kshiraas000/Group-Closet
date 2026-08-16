@@ -9,6 +9,12 @@ struct SignInView: View {
 
     var body: some View {
         VStack(spacing: 24) {
+            Image("AppMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+
             Text("Closet")
                 .font(Theme.Font.headline(44))
                 .foregroundStyle(Theme.Color.primaryText)
@@ -30,6 +36,17 @@ struct SignInView: View {
                     .font(Theme.Font.body(13))
                     .foregroundStyle(.red)
             }
+
+            // Consent notice at the point of account creation — what App
+            // Review looks for, and it makes the agreement actually visible
+            // before someone signs up rather than buried in settings.
+            Text("By continuing you agree to our [Terms of Use](\(LegalLinks.terms)) and [Privacy Policy](\(LegalLinks.privacy)).")
+                .font(Theme.Font.body(12.5))
+                .foregroundStyle(Theme.Color.secondaryText)
+                .tint(Theme.Color.accent)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 44)
+                .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.background)

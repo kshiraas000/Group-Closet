@@ -26,11 +26,11 @@ struct OwnerBadge: View {
 
     private var initialCircle: some View {
         Circle()
-            .fill(Theme.Color.accent.opacity(0.25))
+            .fill(Theme.Color.accent)
             .overlay(
                 Text(initial)
-                    .font(Theme.Font.body(diameter * 0.42, weight: .medium))
-                    .foregroundStyle(Theme.Color.primaryText)
+                    .font(Theme.Font.body(diameter * 0.46, weight: .medium))
+                    .foregroundStyle(Theme.Color.background)
             )
     }
 

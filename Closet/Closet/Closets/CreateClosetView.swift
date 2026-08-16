@@ -15,6 +15,7 @@ struct CreateClosetView: View {
                     form
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Color.background)
             .navigationTitle(createdCloset == nil ? "New Closet" : "Invite Friends")
             .toolbar {
@@ -61,10 +62,10 @@ struct CreateClosetView: View {
             Text("\(closet.name) is ready")
                 .font(Theme.Font.headline(22))
                 .foregroundStyle(Theme.Color.primaryText)
-            Text("Invite code: \(closet.inviteCode)")
+            Text("Invite code: \(ClosetInvite.formatted(closet.inviteCode))")
                 .font(Theme.Font.body(18, weight: .medium))
                 .foregroundStyle(Theme.Color.secondaryText)
-            ShareLink(item: "Join my Closet \"\(closet.name)\" on the Closet app — invite code: \(closet.inviteCode)")
+            ShareLink(item: ClosetInvite.shareMessage(closetName: closet.name, inviteCode: closet.inviteCode))
                 .font(Theme.Font.body(16, weight: .medium))
                 .foregroundStyle(Theme.Color.accent)
             Button("Done") { dismiss() }
