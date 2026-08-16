@@ -162,4 +162,21 @@ final class ClosetDetailViewModel {
             return false
         }
     }
+
+    /// Deletes the closet for everyone. RLS allows this only for the creator, or
+    /// for any member once the creator has deleted their account.
+    func deleteCloset(closetID: UUID) async -> Bool {
+        errorMessage = nil
+        do {
+            try await client
+                .from("closets")
+                .delete()
+                .eq("id", value: closetID)
+                .execute()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
 }
