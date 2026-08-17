@@ -10,6 +10,9 @@ final class ClosetNavigationStore {
         static let favoriteCloset = "favoriteClosetID"
         static let recentOrder = "recentClosetOrder"
         static let cachedClosets = "cachedClosets"
+        static let ownerUserID = "closetNavOwnerUserID"
+
+        static let perUser = [openCloset, favoriteCloset, recentOrder, cachedClosets]
     }
 
     /// The closet the user is currently inside; nil means the list is showing.
@@ -47,13 +50,40 @@ final class ClosetNavigationStore {
     /// what made the Closets list flash before pushing.
     private var cachedClosets: [Closet]
 
-    init() {
+    /// Everything here is written to UserDefaults, which outlives sign-out and
+    /// account deletion. Without an owner check a new user inherits the previous
+    /// one's open closet and closet cache — landing them inside a closet they
+    /// are not a member of, and leaking cached closet names and invite codes.
+    /// Checking on load rather than only clearing at sign-out means this repairs
+    /// itself even if the app was killed mid-sign-out.
+    init(userID: UUID) {
         let defaults = UserDefaults.standard
+        if defaults.string(forKey: Key.ownerUserID) != userID.uuidString {
+            Key.perUser.forEach(defaults.removeObject(forKey:))
+            defaults.set(userID.uuidString, forKey: Key.ownerUserID)
+        }
         openClosetID = (defaults.string(forKey: Key.openCloset)).flatMap(UUID.init(uuidString:))
         favoriteClosetID = (defaults.string(forKey: Key.favoriteCloset)).flatMap(UUID.init(uuidString:))
         recentOrder = (defaults.stringArray(forKey: Key.recentOrder) ?? []).compactMap(UUID.init(uuidString:))
         cachedClosets = (defaults.data(forKey: Key.cachedClosets))
             .flatMap { try? JSONDecoder().decode([Closet].self, from: $0) } ?? []
+    }
+
+    /// Wipes everything on sign-out and account deletion, so a closet cache
+    /// never outlives the session that built it.
+    func clear() {
+        // Assign first: these have didSet observers that write through, so
+        // removing the keys beforehand would just let recentOrder put an empty
+        // array straight back.
+        openClosetID = nil
+        favoriteClosetID = nil
+        recentOrder = []
+        cachedClosets = []
+        didAutoOpen = false
+
+        let defaults = UserDefaults.standard
+        Key.perUser.forEach(defaults.removeObject(forKey:))
+        defaults.removeObject(forKey: Key.ownerUserID)
     }
 
     func cacheClosets(_ closets: [Closet]) {

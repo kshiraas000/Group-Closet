@@ -7,7 +7,13 @@ struct MainTabView: View {
     // Lives here, not in ClosetsListView: switching tabs rebuilds the tab's
     // content from scratch, so the "which closet am I in" state has to be
     // owned by something that outlives it.
-    @State private var closetNavigation = ClosetNavigationStore()
+    @State private var closetNavigation: ClosetNavigationStore
+
+    init(userID: UUID, onSignedOut: @escaping () async -> Void) {
+        self.userID = userID
+        self.onSignedOut = onSignedOut
+        _closetNavigation = State(initialValue: ClosetNavigationStore(userID: userID))
+    }
 
     enum Tab {
         case closets, myClothes, profile
@@ -22,7 +28,12 @@ struct MainTabView: View {
                 case .myClothes:
                     MyClothesView(userID: userID)
                 case .profile:
-                    ProfileView(userID: userID, onSignedOut: onSignedOut)
+                    // Covers account deletion too — ProfileView routes both
+                    // through onSignedOut.
+                    ProfileView(userID: userID, onSignedOut: {
+                        closetNavigation.clear()
+                        await onSignedOut()
+                    })
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
