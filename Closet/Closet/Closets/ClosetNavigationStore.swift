@@ -33,6 +33,15 @@ final class ClosetNavigationStore {
     /// back into a closet they deliberately backed out of.
     var didAutoOpen = false
 
+    /// Bumped when the Closets tab is tapped while already showing. The stack
+    /// lives in ClosetsListView's private State, so this is how the tab bar
+    /// asks it to pop — the counter, not a Bool, so repeat taps still fire.
+    private(set) var popToRootRequests = 0
+
+    func requestPopToRoot() {
+        popToRootRequests += 1
+    }
+
     /// Last known closets, so a restored navigation stack can render its
     /// destination immediately instead of waiting on the network — waiting is
     /// what made the Closets list flash before pushing.

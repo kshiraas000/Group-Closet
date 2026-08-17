@@ -51,6 +51,11 @@ struct MainTabView: View {
     private func tabButton(tab: Tab, systemImage: String, label: String) -> some View {
         let isSelected = selectedTab == tab
         return Button {
+            // Re-tapping the current Closets tab backs out to the list, the
+            // same as the back button.
+            if isSelected, tab == .closets {
+                closetNavigation.requestPopToRoot()
+            }
             selectedTab = tab
         } label: {
             VStack(spacing: 3) {

@@ -78,6 +78,9 @@ struct ClosetsListView: View {
                     navigation.markOpened(opened)
                 }
             }
+            .onChange(of: navigation.popToRootRequests) { _, _ in
+                path.removeAll()
+            }
             .sheet(isPresented: $showingCreate) {
                 CreateClosetView {
                     Task { await viewModel.loadClosets() }
