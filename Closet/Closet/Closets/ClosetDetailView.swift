@@ -298,17 +298,25 @@ struct ClosetDetailView: View {
 
     private func itemCell(_ browseItem: BrowseItem) -> some View {
         let owner = viewModel.members.first { $0.id == browseItem.item.ownerID }
-        return AsyncImage(url: browseItem.signedURL) { phase in
-            if case .success(let image) = phase {
-                image.resizable().scaledToFill()
-            } else {
-                Rectangle()
-                    .fill(Theme.Color.accent.opacity(0.12))
+        // Color.clear takes the grid's proposed width and .fit turns it into a
+        // square. The image fills that square as an overlay and .clipped() cuts
+        // the overflow. Sizing the AsyncImage itself with .aspectRatio(.fill)
+        // let tall photos report a frame bigger than the cell, so they spilled
+        // over their neighbours.
+        return Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                AsyncImage(url: browseItem.signedURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Rectangle()
+                            .fill(Theme.Color.accent.opacity(0.12))
+                    }
+                }
             }
-        }
-        .aspectRatio(1, contentMode: .fill)
-        .clipShape(Rectangle())
-        .overlay(alignment: .bottomLeading) {
+            .clipped()
+            .overlay(alignment: .bottomLeading) {
             OwnerBadge(profile: owner, signedURL: owner.flatMap { viewModel.memberPhotoURLs[$0.id] })
                 .padding(6)
         }
