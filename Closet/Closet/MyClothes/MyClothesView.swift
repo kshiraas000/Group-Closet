@@ -136,5 +136,8 @@ struct MyClothesView: View {
                 }
             }
             .clipped()
+            // clipped() only clips drawing, not hit-testing: without this a
+            // tall photo's invisible overflow steals taps from the filter chips.
+            .contentShape(Rectangle())
     }
 }

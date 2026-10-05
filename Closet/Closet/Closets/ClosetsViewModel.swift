@@ -39,6 +39,38 @@ final class ClosetsViewModel {
         await loadCounts()
     }
 
+    // These report failure by return value rather than errorMessage: on the
+    // list screen errorMessage replaces the whole list, which would strand
+    // the user on an error page over a failed delete.
+    func leave(closetID: UUID, userID: UUID) async -> Bool {
+        do {
+            try await client
+                .from("closet_members")
+                .delete()
+                .eq("closet_id", value: closetID)
+                .eq("user_id", value: userID)
+                .execute()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Deletes the closet for everyone. RLS allows this only for the creator, or
+    /// for any member once the creator has deleted their account.
+    func deleteCloset(closetID: UUID) async -> Bool {
+        do {
+            try await client
+                .from("closets")
+                .delete()
+                .eq("id", value: closetID)
+                .execute()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Row counts for the "N members · N pieces" subtitle. Failures here leave
     /// the subtitle off rather than blanking the whole list — the names are
     /// the load-bearing content.

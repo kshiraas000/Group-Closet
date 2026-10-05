@@ -111,6 +111,42 @@ struct ClosetDetailView: View {
         .sheet(isPresented: $showingMembers) {
             membersSheet
         }
+        .confirmationDialog(
+            "Leave \(closet.name)?",
+            isPresented: $showingLeaveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Leave", role: .destructive) {
+                Task {
+                    if await viewModel.leave(closetID: closet.id, userID: userID) {
+                        onLeft()
+                        dismiss()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if isLastMember {
+                Text("You're the last member. Leaving will delete \(closet.name) for good, including its invite code.")
+            }
+        }
+        .confirmationDialog(
+            "Delete \(closet.name)?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete for Everyone", role: .destructive) {
+                Task {
+                    if await viewModel.deleteCloset(closetID: closet.id) {
+                        onLeft()
+                        dismiss()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes the closet for everyone, not just you. Nobody will be able to open it or use the invite code again. Everyone keeps their own clothes in My Clothes.")
+        }
         .fullScreenCover(item: $detailContext) { context in
             ItemDetailView(
                 items: context.items,
@@ -142,14 +178,47 @@ struct ClosetDetailView: View {
 
             Spacer()
 
-            Button {
-                showingAddItem = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(Theme.Color.accent)
+            HStack(spacing: 20) {
+                Menu {
+                    Button {
+                        showingMembers = true
+                    } label: {
+                        Label("Members", systemImage: "person.2")
+                    }
+                    ShareLink(item: ClosetInvite.shareMessage(closetName: closet.name, inviteCode: closet.inviteCode)) {
+                        Label("Share Invite", systemImage: "square.and.arrow.up")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        showingLeaveConfirmation = true
+                    } label: {
+                        Label("Leave Closet", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                    if canDeleteCloset {
+                        Button(role: .destructive) {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            Label("Delete Closet", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Theme.Color.accent)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showingAddItem = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Theme.Color.accent)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -223,20 +292,6 @@ struct ClosetDetailView: View {
                     .tint(Theme.Color.accent)
                 }
                 .listRowBackground(Theme.Color.background)
-
-                Section {
-                    Button("Leave Closet", role: .destructive) {
-                        showingLeaveConfirmation = true
-                    }
-                    .font(Theme.Font.body(16))
-                    if canDeleteCloset {
-                        Button("Delete Closet", role: .destructive) {
-                            showingDeleteConfirmation = true
-                        }
-                        .font(Theme.Font.body(16))
-                    }
-                }
-                .listRowBackground(Theme.Color.background)
             }
             .scrollContentBackground(.hidden)
             .background(Theme.Color.background)
@@ -247,44 +302,6 @@ struct ClosetDetailView: View {
                     Button("Done") { showingMembers = false }
                         .tint(Theme.Color.accent)
                 }
-            }
-            .confirmationDialog(
-                "Leave \(closet.name)?",
-                isPresented: $showingLeaveConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Leave", role: .destructive) {
-                    Task {
-                        if await viewModel.leave(closetID: closet.id, userID: userID) {
-                            showingMembers = false
-                            onLeft()
-                            dismiss()
-                        }
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                if isLastMember {
-                    Text("You're the last member. Leaving will delete \(closet.name) for good, including its invite code.")
-                }
-            }
-            .confirmationDialog(
-                "Delete \(closet.name)?",
-                isPresented: $showingDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete for Everyone", role: .destructive) {
-                    Task {
-                        if await viewModel.deleteCloset(closetID: closet.id) {
-                            showingMembers = false
-                            onLeft()
-                            dismiss()
-                        }
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This deletes the closet for everyone, not just you. Nobody will be able to open it or use the invite code again. Everyone keeps their own clothes in My Clothes.")
             }
         }
     }
@@ -316,6 +333,9 @@ struct ClosetDetailView: View {
                 }
             }
             .clipped()
+            // clipped() only clips drawing, not hit-testing: without this a
+            // tall photo's invisible overflow steals taps from the filter chips.
+            .contentShape(Rectangle())
             .overlay(alignment: .bottomLeading) {
             OwnerBadge(profile: owner, signedURL: owner.flatMap { viewModel.memberPhotoURLs[$0.id] })
                 .padding(6)

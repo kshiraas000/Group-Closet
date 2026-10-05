@@ -7,13 +7,22 @@ import Foundation
 final class ClosetNavigationStore {
     private enum Key {
         static let openCloset = "openClosetID"
-        static let favoriteCloset = "favoriteClosetID"
         static let recentOrder = "recentClosetOrder"
         static let cachedClosets = "cachedClosets"
         static let ownerUserID = "closetNavOwnerUserID"
+        /// Pre-per-user favorite key; still listed below so it gets cleaned up.
+        static let legacyFavoriteCloset = "favoriteClosetID"
 
-        static let perUser = [openCloset, favoriteCloset, recentOrder, cachedClosets]
+        static let perUser = [openCloset, legacyFavoriteCloset, recentOrder, cachedClosets]
+
+        /// Keyed by user rather than wiped with `perUser`, so a star survives
+        /// sign-out and only ever applies to the account that set it.
+        static func favoriteCloset(_ userID: UUID) -> String {
+            "favoriteClosetID.\(userID.uuidString)"
+        }
     }
+
+    private let userID: UUID
 
     /// The closet the user is currently inside; nil means the list is showing.
     var openClosetID: UUID? {
@@ -21,7 +30,7 @@ final class ClosetNavigationStore {
     }
 
     var favoriteClosetID: UUID? {
-        didSet { write(favoriteClosetID, forKey: Key.favoriteCloset) }
+        didSet { write(favoriteClosetID, forKey: Key.favoriteCloset(userID)) }
     }
 
     /// Most-recently-opened first.
@@ -57,26 +66,27 @@ final class ClosetNavigationStore {
     /// Checking on load rather than only clearing at sign-out means this repairs
     /// itself even if the app was killed mid-sign-out.
     init(userID: UUID) {
+        self.userID = userID
         let defaults = UserDefaults.standard
         if defaults.string(forKey: Key.ownerUserID) != userID.uuidString {
             Key.perUser.forEach(defaults.removeObject(forKey:))
             defaults.set(userID.uuidString, forKey: Key.ownerUserID)
         }
         openClosetID = (defaults.string(forKey: Key.openCloset)).flatMap(UUID.init(uuidString:))
-        favoriteClosetID = (defaults.string(forKey: Key.favoriteCloset)).flatMap(UUID.init(uuidString:))
+        favoriteClosetID = (defaults.string(forKey: Key.favoriteCloset(userID))).flatMap(UUID.init(uuidString:))
         recentOrder = (defaults.stringArray(forKey: Key.recentOrder) ?? []).compactMap(UUID.init(uuidString:))
         cachedClosets = (defaults.data(forKey: Key.cachedClosets))
             .flatMap { try? JSONDecoder().decode([Closet].self, from: $0) } ?? []
     }
 
     /// Wipes everything on sign-out and account deletion, so a closet cache
-    /// never outlives the session that built it.
+    /// never outlives the session that built it. The favorite is kept: it's
+    /// stored under this user's own key, so it can't leak to another account.
     func clear() {
         // Assign first: these have didSet observers that write through, so
         // removing the keys beforehand would just let recentOrder put an empty
         // array straight back.
         openClosetID = nil
-        favoriteClosetID = nil
         recentOrder = []
         cachedClosets = []
         didAutoOpen = false
@@ -130,6 +140,13 @@ final class ClosetNavigationStore {
         if openClosetID == closetID { openClosetID = nil }
         if favoriteClosetID == closetID { favoriteClosetID = nil }
         recentOrder.removeAll { $0 == closetID }
+        // Written directly, not via cacheClosets(): that refuses an empty list,
+        // and leaving your last closet must still drop it — otherwise the next
+        // launch's initialPath() reopens a closet that no longer exists.
+        cachedClosets.removeAll { $0.id == closetID }
+        if let data = try? JSONEncoder().encode(cachedClosets) {
+            UserDefaults.standard.set(data, forKey: Key.cachedClosets)
+        }
     }
 
     /// Favorite first, then most-recently-opened, then whatever order the

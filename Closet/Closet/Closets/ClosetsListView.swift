@@ -4,6 +4,8 @@ struct ClosetsListView: View {
     @State private var viewModel = ClosetsViewModel()
     @State private var showingCreate = false
     @State private var showingJoin = false
+    @State private var pendingRemoval: Closet?
+    @State private var showingRemovalError = false
     @State private var path: [UUID]
     let navigation: ClosetNavigationStore
     let userID: UUID
@@ -91,7 +93,42 @@ struct ClosetsListView: View {
                     Task { await viewModel.loadClosets() }
                 }
             }
+            .confirmationDialog(
+                removalTitle,
+                isPresented: Binding(
+                    get: { pendingRemoval != nil },
+                    set: { if !$0 { pendingRemoval = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingRemoval
+            ) { closet in
+                Button(canDelete(closet) ? "Delete for Everyone" : "Leave", role: .destructive) {
+                    Task { await confirmRemoval(of: closet) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { closet in
+                Text(removalMessage(for: closet))
+            }
+            .alert("Something went wrong. Please try again.", isPresented: $showingRemovalError) {
+                Button("OK") {}
+            }
         }
+    }
+
+    private var removalTitle: String {
+        guard let closet = pendingRemoval else { return "" }
+        return canDelete(closet) ? "Delete \(closet.name)?" : "Leave \(closet.name)?"
+    }
+
+    /// Same wording as the dialogs inside ClosetDetailView.
+    private func removalMessage(for closet: Closet) -> String {
+        if canDelete(closet) {
+            return "This deletes the closet for everyone, not just you. Nobody will be able to open it or use the invite code again. Everyone keeps their own clothes in My Clothes."
+        }
+        if (viewModel.memberCounts[closet.id] ?? 0) <= 1 {
+            return "You're the last member. Leaving will delete \(closet.name) for good, including its invite code."
+        }
+        return ""
     }
 
     /// Re-enters the closet the user was last inside (so a tab switch or a
@@ -160,10 +197,12 @@ struct ClosetsListView: View {
         .padding(.bottom, 12)
     }
 
+    // A List (styled to look like the old plain stack) rather than a
+    // ScrollView, because .swipeActions only works on List rows.
     private var closetRows: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(Array(sortedClosets.enumerated()), id: \.element.id) { index, closet in
+        List {
+            ForEach(Array(sortedClosets.enumerated()), id: \.element.id) { index, closet in
+                VStack(spacing: 0) {
                     if index > 0 {
                         Divider()
                             .overlay(Theme.Color.divider)
@@ -171,11 +210,42 @@ struct ClosetsListView: View {
                     }
                     closetRow(closet)
                 }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Theme.Color.background)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    // Not role: .destructive — that animates the row away
+                    // immediately, before the user has confirmed.
+                    Button(canDelete(closet) ? "Delete" : "Leave") {
+                        pendingRemoval = closet
+                    }
+                    .tint(.red)
+                }
             }
-            .padding(.bottom, 24)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, 24, for: .scrollContent)
         .refreshable {
             await viewModel.loadClosets()
+        }
+    }
+
+    /// Mirrors the DELETE policy on public.closets: the creator, or any member
+    /// once the creator has deleted their account and created_by went null.
+    private func canDelete(_ closet: Closet) -> Bool {
+        closet.createdBy == userID || closet.createdBy == nil
+    }
+
+    private func confirmRemoval(of closet: Closet) async {
+        let success = canDelete(closet)
+            ? await viewModel.deleteCloset(closetID: closet.id)
+            : await viewModel.leave(closetID: closet.id, userID: userID)
+        if success {
+            navigation.forget(closet.id)
+            await viewModel.loadClosets()
+        } else {
+            showingRemovalError = true
         }
     }
 
