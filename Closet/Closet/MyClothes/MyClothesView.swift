@@ -11,6 +11,7 @@ struct MyClothesView: View {
     @State private var detailContext: ItemDetailContext?
     @State private var showingFilters = false
     @State private var selection = GridSelection()
+    @State private var isRunningBulk = false
     @State private var showingBulkDeleteConfirmation = false
     @State private var showingBulkEdit = false
     @State private var showingAddToClosetPicker = false
@@ -105,6 +106,7 @@ struct MyClothesView: View {
                         onEdit: { showingBulkEdit = true },
                         onDelete: { showingBulkDeleteConfirmation = true }
                     )
+                    .disabled(isRunningBulk)
                 }
             }
             .background(Theme.Color.background)
@@ -138,10 +140,11 @@ struct MyClothesView: View {
                     let items = selectedItems.map(\.item)
                     do {
                         try await BulkItemActions.apply(edit, to: items)
-                        selection.end()
                         await viewModel.load(userID: userID)
+                        selection.end()
                         return true
                     } catch {
+                        await viewModel.load(userID: userID)
                         return false
                     }
                 }
@@ -231,6 +234,9 @@ struct MyClothesView: View {
 
     /// Runs a bulk action, then reloads and leaves select mode on success.
     private func runBulk(_ action: () async throws -> Void) async {
+        guard !isRunningBulk else { return }
+        isRunningBulk = true
+        defer { isRunningBulk = false }
         do {
             try await action()
             selection.end()
