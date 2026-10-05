@@ -1,12 +1,16 @@
 import SwiftUI
 import UIKit
 
-/// A compact bottom sheet, sized to its content: it grows once the preview
-/// card appears, rather than reserving space for it up front.
+/// A compact bottom sheet with two fixed sizes — no preview card yet, or
+/// with one — switched by `selectedDetent` rather than measured, which is
+/// the supported, reliable way to resize a sheet between a few known states.
 struct JoinClosetView: View {
+    private static let collapsedDetent: PresentationDetent = .height(260)
+    private static let expandedDetent: PresentationDetent = .height(380)
+
     @State private var viewModel = JoinClosetViewModel()
     @FocusState private var isCodeFocused: Bool
-    @State private var sheetHeight: CGFloat = 260
+    @State private var selectedDetent: PresentationDetent = JoinClosetView.collapsedDetent
     @State private var clipboardCode: String?
     @Environment(\.dismiss) private var dismiss
     let onJoined: (UUID) -> Void
@@ -73,12 +77,14 @@ struct JoinClosetView: View {
         .padding(20)
         .padding(.bottom, 4)
         .background(Theme.Color.background)
-        .reportSheetHeight(to: $sheetHeight)
-        .presentationDetents([.height(max(sheetHeight, 1))])
+        .presentationDetents([Self.collapsedDetent, Self.expandedDetent], selection: $selectedDetent)
         .presentationDragIndicator(.visible)
         .onAppear {
             isCodeFocused = true
             clipboardCode = Self.validClipboardCode()
+        }
+        .onChange(of: viewModel.preview?.closetID) { _, closetID in
+            selectedDetent = closetID == nil ? Self.collapsedDetent : Self.expandedDetent
         }
     }
 

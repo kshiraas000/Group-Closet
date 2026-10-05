@@ -1,12 +1,10 @@
 import SwiftUI
 
 /// A compact bottom sheet, not a full-screen Form — the whole flow is one
-/// field. Sizes itself to its content via reportSheetHeight rather than a
-/// fixed or .medium detent.
+/// field, so a single fixed height fits it without measuring anything.
 struct CreateClosetView: View {
     @State private var viewModel = CreateClosetViewModel()
     @FocusState private var isNameFocused: Bool
-    @State private var sheetHeight: CGFloat = 220
     @Environment(\.dismiss) private var dismiss
     let onCreated: (UUID) -> Void
 
@@ -64,8 +62,7 @@ struct CreateClosetView: View {
         .padding(20)
         .padding(.bottom, 4)
         .background(Theme.Color.background)
-        .reportSheetHeight(to: $sheetHeight)
-        .presentationDetents([.height(max(sheetHeight, 1))])
+        .presentationDetents([.height(260)])
         .presentationDragIndicator(.visible)
         .onAppear { isNameFocused = true }
     }
