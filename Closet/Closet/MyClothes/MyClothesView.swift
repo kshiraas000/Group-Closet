@@ -20,6 +20,17 @@ struct MyClothesView: View {
     @State private var tileFrames: [UUID: CGRect] = [:]
     @State private var dragAnchorID: UUID?
     let userID: UUID
+    let onFiltersChanged: (BrowseFilters) -> Void
+
+    /// `initialFilters` seeds the view model up front (not in .task) so a
+    /// restored filter is already applied on the first frame.
+    init(userID: UUID, initialFilters: BrowseFilters, onFiltersChanged: @escaping (BrowseFilters) -> Void) {
+        self.userID = userID
+        self.onFiltersChanged = onFiltersChanged
+        let viewModel = MyClothesViewModel()
+        viewModel.filters = initialFilters
+        _viewModel = State(initialValue: viewModel)
+    }
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 2),
@@ -168,6 +179,9 @@ struct MyClothesView: View {
             .sensoryFeedback(.selection, trigger: selection.selectedIDs)
             .onChange(of: viewModel.filteredItems.map(\.id)) { _, visible in
                 selection.retain(Set(visible))
+            }
+            .onChange(of: viewModel.filters) { _, filters in
+                onFiltersChanged(filters)
             }
             .fullScreenCover(item: $detailContext) { context in
                 ItemDetailView(

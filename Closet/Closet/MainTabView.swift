@@ -8,6 +8,9 @@ struct MainTabView: View {
     // content from scratch, so the "which closet am I in" state has to be
     // owned by something that outlives it.
     @State private var closetNavigation: ClosetNavigationStore
+    /// Same reason as closetNavigation: My Clothes is rebuilt on every tab
+    /// switch, so its filters live here. Resets on sign-out with this view.
+    @State private var myClothesFilters = BrowseFilters()
 
     init(userID: UUID, onSignedOut: @escaping () async -> Void) {
         self.userID = userID
@@ -26,7 +29,11 @@ struct MainTabView: View {
                 case .closets:
                     ClosetsListView(navigation: closetNavigation, userID: userID)
                 case .myClothes:
-                    MyClothesView(userID: userID)
+                    MyClothesView(
+                        userID: userID,
+                        initialFilters: myClothesFilters,
+                        onFiltersChanged: { myClothesFilters = $0 }
+                    )
                 case .profile:
                     // Covers account deletion too — ProfileView routes both
                     // through onSignedOut.
