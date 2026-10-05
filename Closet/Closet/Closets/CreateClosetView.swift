@@ -6,7 +6,7 @@ import SwiftUI
 struct CreateClosetView: View {
     @State private var viewModel = CreateClosetViewModel()
     @FocusState private var isNameFocused: Bool
-    @State private var sheetHeight: CGFloat = 1
+    @State private var sheetHeight: CGFloat = 220
     @Environment(\.dismiss) private var dismiss
     let onCreated: (UUID) -> Void
 

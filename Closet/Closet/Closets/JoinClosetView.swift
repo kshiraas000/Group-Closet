@@ -6,7 +6,7 @@ import UIKit
 struct JoinClosetView: View {
     @State private var viewModel = JoinClosetViewModel()
     @FocusState private var isCodeFocused: Bool
-    @State private var sheetHeight: CGFloat = 1
+    @State private var sheetHeight: CGFloat = 260
     @State private var clipboardCode: String?
     @Environment(\.dismiss) private var dismiss
     let onJoined: (UUID) -> Void
