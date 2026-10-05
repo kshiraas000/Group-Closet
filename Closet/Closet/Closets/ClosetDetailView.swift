@@ -17,6 +17,7 @@ struct ClosetDetailView: View {
     @State private var selection = GridSelection()
     @State private var isRunningBulk = false
     @State private var showingBulkDeleteConfirmation = false
+    @State private var showingBulkRemoveConfirmation = false
     @State private var showingBulkEdit = false
     @State private var showingAddToClosetPicker = false
     @State private var showingBulkActionError = false
@@ -25,7 +26,27 @@ struct ClosetDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let closet: Closet
     let userID: UUID
+    let onFiltersChanged: (BrowseFilters) -> Void
     let onLeft: () -> Void
+
+    /// `initialFilters` seeds the view model up front (not in .task) so a
+    /// restored filter is already applied on the first frame, with no flash
+    /// of the unfiltered grid.
+    init(
+        closet: Closet,
+        userID: UUID,
+        initialFilters: BrowseFilters,
+        onFiltersChanged: @escaping (BrowseFilters) -> Void,
+        onLeft: @escaping () -> Void
+    ) {
+        self.closet = closet
+        self.userID = userID
+        self.onFiltersChanged = onFiltersChanged
+        self.onLeft = onLeft
+        let viewModel = ClosetDetailViewModel()
+        viewModel.filters = initialFilters
+        _viewModel = State(initialValue: viewModel)
+    }
 
     /// Mirrors the DELETE policy on public.closets: the creator, or any member
     /// once the creator has deleted their account and created_by went null.
@@ -122,7 +143,7 @@ struct ClosetDetailView: View {
                     count: selection.count,
                     removeTitle: "Remove",
                     onAdd: { showingAddToClosetPicker = true },
-                    onRemove: { Task { await removeSelectedFromThisCloset() } },
+                    onRemove: { showingBulkRemoveConfirmation = true },
                     onEdit: { showingBulkEdit = true },
                     onDelete: { showingBulkDeleteConfirmation = true }
                 )
@@ -186,12 +207,27 @@ struct ClosetDetailView: View {
         } message: {
             Text("This removes them from every closet and can't be undone.")
         }
+        .confirmationDialog(
+            "Remove \(selection.count) piece\(selection.count == 1 ? "" : "s") from \(closet.name)?",
+            isPresented: $showingBulkRemoveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove from This Closet", role: .destructive) {
+                Task { await removeSelectedFromThisCloset() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This only removes them from \(closet.name). They stay in My Clothes and any other closets they're in.")
+        }
         .alert("Something went wrong. Please try again.", isPresented: $showingBulkActionError) {
             Button("OK") {}
         }
         .sensoryFeedback(.selection, trigger: selection.selectedIDs)
         .onChange(of: viewModel.filteredItems.map(\.id)) { _, visible in
             selection.retain(Set(visible))
+        }
+        .onChange(of: viewModel.filters) { _, filters in
+            onFiltersChanged(filters)
         }
         .confirmationDialog(
             "Leave \(closet.name)?",

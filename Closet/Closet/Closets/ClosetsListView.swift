@@ -54,7 +54,12 @@ struct ClosetsListView: View {
                 // yet — an unresolved destination used to render blank.
                 if let closet = viewModel.closets.first(where: { $0.id == closetID })
                     ?? navigation.cachedCloset(id: closetID) {
-                    ClosetDetailView(closet: closet, userID: userID) {
+                    ClosetDetailView(
+                        closet: closet,
+                        userID: userID,
+                        initialFilters: navigation.filters(for: closet.id),
+                        onFiltersChanged: { navigation.setFilters($0, for: closet.id) }
+                    ) {
                         navigation.forget(closet.id)
                         Task { await viewModel.loadClosets() }
                     }

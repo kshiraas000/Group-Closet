@@ -54,6 +54,19 @@ final class ClosetNavigationStore {
         popToRootRequests += 1
     }
 
+    /// Session-only: each closet's filters and search, so switching tabs (which
+    /// rebuilds the closet screen) doesn't reset them. Not observed — it's
+    /// written on every search keystroke, and nothing needs to redraw for it.
+    @ObservationIgnored private var filtersByCloset: [UUID: BrowseFilters] = [:]
+
+    func filters(for closetID: UUID) -> BrowseFilters {
+        filtersByCloset[closetID] ?? BrowseFilters()
+    }
+
+    func setFilters(_ filters: BrowseFilters, for closetID: UUID) {
+        filtersByCloset[closetID] = filters
+    }
+
     /// Last known closets, so a restored navigation stack can render its
     /// destination immediately instead of waiting on the network — waiting is
     /// what made the Closets list flash before pushing.
@@ -89,6 +102,7 @@ final class ClosetNavigationStore {
         openClosetID = nil
         recentOrder = []
         cachedClosets = []
+        filtersByCloset = [:]
         didAutoOpen = false
 
         let defaults = UserDefaults.standard
@@ -140,6 +154,7 @@ final class ClosetNavigationStore {
         if openClosetID == closetID { openClosetID = nil }
         if favoriteClosetID == closetID { favoriteClosetID = nil }
         recentOrder.removeAll { $0 == closetID }
+        filtersByCloset[closetID] = nil
         // Written directly, not via cacheClosets(): that refuses an empty list,
         // and leaving your last closet must still drop it — otherwise the next
         // launch's initialPath() reopens a closet that no longer exists.
