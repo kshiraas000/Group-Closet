@@ -22,6 +22,7 @@ extension View {
 /// vertical drags still scroll the grid (the Photos behaviour).
 @available(iOS 18.0, *)
 struct DragSelectGesture: UIGestureRecognizerRepresentable {
+    let isEnabled: Bool
     let coordinateSpace: String
     let onChanged: (CGPoint) -> Void
     let onEnded: () -> Void
@@ -42,6 +43,11 @@ struct DragSelectGesture: UIGestureRecognizerRepresentable {
         let pan = UIPanGestureRecognizer()
         pan.delegate = context.coordinator
         return pan
+    }
+
+    /// Disabling a recognizer mid-gesture cancels it, which calls onEnded.
+    func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        recognizer.isEnabled = isEnabled
     }
 
     func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
@@ -65,12 +71,10 @@ struct DragSelectModifier: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if isEnabled {
-            if #available(iOS 18.0, *) {
-                content.gesture(DragSelectGesture(coordinateSpace: "grid", onChanged: onChanged, onEnded: onEnded))
-            } else {
-                content
-            }
+        // Always the same view structure so toggling select mode doesn't
+        // rebuild the grid; the gesture enables/disables itself.
+        if #available(iOS 18.0, *) {
+            content.gesture(DragSelectGesture(isEnabled: isEnabled, coordinateSpace: "grid", onChanged: onChanged, onEnded: onEnded))
         } else {
             content
         }

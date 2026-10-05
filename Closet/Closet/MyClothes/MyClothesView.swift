@@ -79,13 +79,13 @@ struct MyClothesView: View {
                                         }
                                 }
                             }
-                            .coordinateSpace(.named("grid"))
                             .onPreferenceChange(TileFramesKey.self) { tileFrames = $0 }
                             .modifier(DragSelectModifier(
                                 isEnabled: selection.isActive,
                                 onChanged: dragChanged,
                                 onEnded: dragEnded
                             ))
+                            .coordinateSpace(.named("grid"))
                         }
                     }
                     .padding(.horizontal, 20)
