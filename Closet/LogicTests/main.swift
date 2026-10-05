@@ -111,6 +111,16 @@ do {
     check(BulkEdit.parseOccasions(" a, ,b ,") == ["a", "b"], "testParseOccasions")
 }
 
+// GridDragSelect
+
+do {
+    let order = [a, b, c]
+    let covered = GridDragSelect.coveredIDs(order: order, from: c, to: a, selectable: [a, c])
+    check(covered == [a, c], "testCoveredRangeIsOrderIndependentAndSkipsUnselectable")
+    check(GridDragSelect.coveredIDs(order: order, from: a, to: UUID(), selectable: [a]) == [],
+          "testCoveredRangeEmptyForUnknownID")
+}
+
 if failures > 0 {
     print("\(failures) FAILED")
     exit(1)

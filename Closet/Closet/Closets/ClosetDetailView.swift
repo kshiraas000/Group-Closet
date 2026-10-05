@@ -19,6 +19,8 @@ struct ClosetDetailView: View {
     @State private var showingBulkEdit = false
     @State private var showingAddToClosetPicker = false
     @State private var showingBulkActionError = false
+    @State private var tileFrames: [UUID: CGRect] = [:]
+    @State private var dragAnchorID: UUID?
     @Environment(\.dismiss) private var dismiss
     let closet: Closet
     let userID: UUID
@@ -85,6 +87,7 @@ struct ClosetDetailView: View {
                                 // Button: a Button also fires on release after a
                                 // long hold, un-selecting the tile it just selected.
                                 itemCell(browseItem)
+                                    .reportTileFrame(id: browseItem.id, in: "grid")
                                     .onTapGesture { tileTapped(browseItem) }
                                     .onLongPressGesture(minimumDuration: 0.35) {
                                         if !selection.isActive, isOwned(browseItem) {
@@ -99,6 +102,13 @@ struct ClosetDetailView: View {
                                     }
                             }
                         }
+                        .coordinateSpace(.named("grid"))
+                        .onPreferenceChange(TileFramesKey.self) { tileFrames = $0 }
+                        .modifier(DragSelectModifier(
+                            isEnabled: selection.isActive,
+                            onChanged: dragChanged,
+                            onEnded: dragEnded
+                        ))
                     }
                 }
                 .padding(.horizontal, 20)
@@ -392,6 +402,24 @@ struct ClosetDetailView: View {
         } else {
             openDetail(for: browseItem)
         }
+    }
+
+    private func dragChanged(_ location: CGPoint) {
+        guard let id = tileFrames.first(where: { $0.value.contains(location) })?.key else { return }
+        if dragAnchorID == nil {
+            guard let tile = viewModel.filteredItems.first(where: { $0.id == id }), isOwned(tile) else { return }
+            dragAnchorID = id
+            selection.beginDrag(on: id)
+        }
+        guard let anchor = dragAnchorID else { return }
+        let order = viewModel.filteredItems.map(\.id)
+        let selectable = Set(viewModel.filteredItems.filter(isOwned).map(\.id))
+        selection.updateDrag(covering: GridDragSelect.coveredIDs(order: order, from: anchor, to: id, selectable: selectable))
+    }
+
+    private func dragEnded() {
+        dragAnchorID = nil
+        selection.endDrag()
     }
 
     private var selectedItems: [BrowseItem] {

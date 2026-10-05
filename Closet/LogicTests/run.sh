@@ -8,5 +8,6 @@ xcrun swiftc -o "$out" \
   Closet/Models/Item.swift \
   Closet/Selection/GridSelection.swift \
   Closet/Selection/BulkEdit.swift \
+  Closet/Selection/GridDragSelect.swift \
   LogicTests/main.swift
 "$out"
