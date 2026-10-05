@@ -10,6 +10,12 @@ struct MyClothesView: View {
     @State private var viewModel = MyClothesViewModel()
     @State private var detailContext: ItemDetailContext?
     @State private var showingFilters = false
+    @State private var selection = GridSelection()
+    @State private var showingBulkDeleteConfirmation = false
+    @State private var showingBulkEdit = false
+    @State private var showingAddToClosetPicker = false
+    @State private var showingRemoveFromClosetPicker = false
+    @State private var showingBulkActionError = false
     let userID: UUID
 
     private let gridColumns = [
@@ -20,57 +26,80 @@ struct MyClothesView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    header
+            VStack(spacing: 0) {
+                if selection.isActive {
+                    SelectionTopBar(count: selection.count) { selection.end() }
+                }
 
-                    SearchField(text: $viewModel.filters.searchText, placeholder: "Search your clothes")
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        header
 
-                    CategoryChipsRow(selectedCategories: $viewModel.filters.categories) {
-                        showingFilters = true
-                    }
+                        SearchField(text: $viewModel.filters.searchText, placeholder: "Search your clothes")
 
-                    ActiveFiltersRow(filters: $viewModel.filters, ownerName: nil)
+                        CategoryChipsRow(selectedCategories: $viewModel.filters.categories) {
+                            showingFilters = true
+                        }
 
-                    if let errorMessage = viewModel.errorMessage {
-                        Text(errorMessage)
-                            .font(Theme.Font.body(14))
-                            .foregroundStyle(.red)
-                    }
+                        ActiveFiltersRow(filters: $viewModel.filters, ownerName: nil)
 
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
-                    } else if viewModel.filteredItems.isEmpty {
-                        Text(viewModel.items.isEmpty ? "No items yet" : "No items match your filters")
-                            .font(Theme.Font.body(14))
-                            .foregroundStyle(Theme.Color.secondaryText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
-                    } else {
-                        LazyVGrid(columns: gridColumns, spacing: 2) {
-                            ForEach(viewModel.filteredItems) { browseItem in
-                                Button {
-                                    openDetail(for: browseItem)
-                                } label: {
+                        if let errorMessage = viewModel.errorMessage {
+                            Text(errorMessage)
+                                .font(Theme.Font.body(14))
+                                .foregroundStyle(.red)
+                        }
+
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 40)
+                        } else if viewModel.filteredItems.isEmpty {
+                            Text(viewModel.items.isEmpty ? "No items yet" : "No items match your filters")
+                                .font(Theme.Font.body(14))
+                                .foregroundStyle(Theme.Color.secondaryText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 40)
+                        } else {
+                            LazyVGrid(columns: gridColumns, spacing: 2) {
+                                ForEach(viewModel.filteredItems) { browseItem in
+                                    // Tap and long-press as separate gestures, not a
+                                    // Button: a Button also fires on release after a
+                                    // long hold, un-selecting the tile it just selected.
                                     itemCell(browseItem)
+                                        .onTapGesture { tileTapped(browseItem) }
+                                        .onLongPressGesture(minimumDuration: 0.35) {
+                                            if !selection.isActive { selection.begin(with: browseItem.id) }
+                                        }
+                                        .accessibilityAddTraits(.isButton)
+                                        .accessibilityAction(named: "Select") {
+                                            if !selection.isActive { selection.begin(with: browseItem.id) }
+                                        }
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 32)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .refreshable {
+                    await viewModel.load(userID: userID)
+                }
+
+                if selection.isActive {
+                    SelectionActionBar(
+                        count: selection.count,
+                        removeTitle: "Remove from…",
+                        onAdd: { showingAddToClosetPicker = true },
+                        onRemove: { showingRemoveFromClosetPicker = true },
+                        onEdit: { showingBulkEdit = true },
+                        onDelete: { showingBulkDeleteConfirmation = true }
+                    )
+                }
             }
             .background(Theme.Color.background)
             .toolbar(.hidden, for: .navigationBar)
             .task {
-                await viewModel.load(userID: userID)
-            }
-            .refreshable {
                 await viewModel.load(userID: userID)
             }
             .sheet(isPresented: $showingFilters) {
@@ -81,6 +110,51 @@ struct MyClothesView: View {
                     availableColors: viewModel.availableColors,
                     availableOccasions: viewModel.availableOccasions
                 )
+            }
+            .sheet(isPresented: $showingAddToClosetPicker) {
+                ClosetPickerSheet(title: "Add to Closet", excludingClosetID: nil) { target in
+                    let ids = Array(selection.selectedIDs)
+                    Task { await runBulk { try await BulkItemActions.addShares(itemIDs: ids, closetID: target.id) } }
+                }
+            }
+            .sheet(isPresented: $showingRemoveFromClosetPicker) {
+                ClosetPickerSheet(title: "Remove from Closet", excludingClosetID: nil) { target in
+                    let ids = Array(selection.selectedIDs)
+                    Task { await runBulk { try await BulkItemActions.removeShares(itemIDs: ids, closetID: target.id) } }
+                }
+            }
+            .sheet(isPresented: $showingBulkEdit) {
+                BulkEditView(count: selection.count) { edit in
+                    let items = selectedItems.map(\.item)
+                    do {
+                        try await BulkItemActions.apply(edit, to: items)
+                        selection.end()
+                        await viewModel.load(userID: userID)
+                        return true
+                    } catch {
+                        return false
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Delete \(selection.count) piece\(selection.count == 1 ? "" : "s")?",
+                isPresented: $showingBulkDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    let items = selectedItems
+                    Task { await runBulk { try await BulkItemActions.delete(items) } }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes them from every closet and can't be undone.")
+            }
+            .alert("Something went wrong. Please try again.", isPresented: $showingBulkActionError) {
+                Button("OK") {}
+            }
+            .sensoryFeedback(.selection, trigger: selection.selectedIDs)
+            .onChange(of: viewModel.filteredItems.map(\.id)) { _, visible in
+                selection.retain(Set(visible))
             }
             .fullScreenCover(item: $detailContext) { context in
                 ItemDetailView(
@@ -117,6 +191,29 @@ struct MyClothesView: View {
         }
     }
 
+    private func tileTapped(_ browseItem: BrowseItem) {
+        if selection.isActive {
+            selection.toggle(browseItem.id)
+        } else {
+            openDetail(for: browseItem)
+        }
+    }
+
+    private var selectedItems: [BrowseItem] {
+        viewModel.items.filter { selection.selectedIDs.contains($0.id) }
+    }
+
+    /// Runs a bulk action, then reloads and leaves select mode on success.
+    private func runBulk(_ action: () async throws -> Void) async {
+        do {
+            try await action()
+            selection.end()
+        } catch {
+            showingBulkActionError = true
+        }
+        await viewModel.load(userID: userID)
+    }
+
     private func itemCell(_ browseItem: BrowseItem) -> some View {
         // Color.clear takes the grid's proposed width and .fit turns it into a
         // square. The image fills that square as an overlay and .clipped() cuts
@@ -139,5 +236,10 @@ struct MyClothesView: View {
             // clipped() only clips drawing, not hit-testing: without this a
             // tall photo's invisible overflow steals taps from the filter chips.
             .contentShape(Rectangle())
+            .overlay(alignment: .bottomTrailing) {
+                if selection.isActive {
+                    SelectionCheckmark(isSelected: selection.selectedIDs.contains(browseItem.id))
+                }
+            }
     }
 }
