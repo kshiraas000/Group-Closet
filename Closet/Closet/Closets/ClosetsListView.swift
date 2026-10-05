@@ -180,56 +180,82 @@ struct ClosetsListView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Closets")
                 .font(Theme.Font.headline(32))
                 .foregroundStyle(Theme.Color.primaryText)
 
-            Spacer()
-
-            Menu {
-                Button("Create a Closet") { showingCreate = true }
-                Button("Join with invite code") { showingJoin = true }
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(Theme.Color.accent)
+            HStack(spacing: 8) {
+                actionPill("Create Closet", systemImage: "plus", isPrimary: true) {
+                    showingCreate = true
+                }
+                actionPill("Join with Code", systemImage: "number", isPrimary: false) {
+                    showingJoin = true
+                }
             }
-            .buttonStyle(.plain)
+
+            if !viewModel.isLoading, !viewModel.closets.isEmpty {
+                HStack(spacing: 8) {
+                    Text("YOUR CLOSETS")
+                        .foregroundStyle(Theme.Color.secondaryText)
+                    Text("\(viewModel.closets.count)")
+                        .foregroundStyle(Theme.Color.tertiaryText)
+                }
+                .font(Theme.Font.body(12, weight: .medium))
+                .tracking(0.4)
+                .padding(.top, 10)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.top, 16)
-        .padding(.bottom, 12)
+        .padding(.bottom, 4)
+    }
+
+    private func actionPill(
+        _ title: String,
+        systemImage: String,
+        isPrimary: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title)
+                    .font(Theme.Font.body(13.5, weight: .medium))
+            }
+            .foregroundStyle(isPrimary ? Theme.Color.background : Theme.Color.primaryText)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(isPrimary ? Theme.Color.accent : Theme.Color.primaryText.opacity(0.06))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // A List (styled to look like the old plain stack) rather than a
     // ScrollView, because .swipeActions only works on List rows.
     private var closetRows: some View {
         List {
-            ForEach(Array(sortedClosets.enumerated()), id: \.element.id) { index, closet in
-                VStack(spacing: 0) {
-                    if index > 0 {
-                        Divider()
-                            .overlay(Theme.Color.divider)
-                            .padding(.leading, 20)
+            ForEach(sortedClosets) { closet in
+                closetRow(closet)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Theme.Color.background)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        // Not role: .destructive — that animates the row away
+                        // immediately, before the user has confirmed.
+                        Button(canDelete(closet) ? "Delete" : "Leave") {
+                            pendingRemoval = closet
+                        }
+                        .tint(.red)
                     }
-                    closetRow(closet)
-                }
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Theme.Color.background)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    // Not role: .destructive — that animates the row away
-                    // immediately, before the user has confirmed.
-                    Button(canDelete(closet) ? "Delete" : "Leave") {
-                        pendingRemoval = closet
-                    }
-                    .tint(.red)
-                }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .contentMargins(.top, 6, for: .scrollContent)
         .contentMargins(.bottom, 24, for: .scrollContent)
         .refreshable {
             await viewModel.loadClosets()
@@ -254,18 +280,21 @@ struct ClosetsListView: View {
         }
     }
 
+    /// Laid out star · text · chevron so a closet picture (photo, initials or
+    /// emoji, like a contact photo) can later slot in as a ~40pt circle
+    /// between the star and the name without reworking the row.
     private func closetRow(_ closet: Closet) -> some View {
         let isFavorite = navigation.favoriteClosetID == closet.id
-        return HStack(spacing: 10) {
+        return HStack(spacing: 6) {
             // A sibling button rather than one nested inside the row button:
             // nesting them would make the star's tap also trigger navigation.
             Button {
                 navigation.toggleFavorite(closet.id)
             } label: {
                 Image(systemName: isFavorite ? "star.fill" : "star")
-                    .font(.system(size: 15))
+                    .font(.system(size: 14))
                     .foregroundStyle(isFavorite ? Color(red: 0.85, green: 0.65, blue: 0.13) : Theme.Color.tertiaryText)
-                    .frame(width: 28, height: 44)
+                    .frame(width: 32, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -273,30 +302,54 @@ struct ClosetsListView: View {
             Button {
                 path = [closet.id]
             } label: {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(closet.name)
-                            .font(Theme.Font.headline(20))
+                            .font(Theme.Font.headline(19))
                             .foregroundStyle(Theme.Color.primaryText)
-                            .multilineTextAlignment(.leading)
+                            .lineLimit(1)
 
-                        Text(subtitle(for: closet))
-                            .font(Theme.Font.body(12.5))
-                            .foregroundStyle(Theme.Color.secondaryText)
+                        HStack(spacing: 7) {
+                            memberAvatars(for: closet)
+                            Text(subtitle(for: closet))
+                                .font(Theme.Font.body(12.5))
+                                .foregroundStyle(Theme.Color.tertiaryText)
+                                .lineLimit(1)
+                        }
                     }
 
-                    Spacer()
+                    Spacer(minLength: 0)
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.tertiaryText)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.tertiaryText.opacity(0.7))
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 20)
+        .padding(.leading, 6)
+        .padding(.trailing, 16)
         .padding(.vertical, 12)
+        .background(Theme.Color.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    @ViewBuilder
+    private func memberAvatars(for closet: Closet) -> some View {
+        let members = viewModel.members[closet.id] ?? []
+        if !members.isEmpty {
+            HStack(spacing: -5) {
+                ForEach(members.prefix(3)) { member in
+                    OwnerBadge(
+                        profile: member,
+                        signedURL: viewModel.memberPhotoURLs[member.id],
+                        diameter: 18,
+                        ringColor: Theme.Color.cardBackground
+                    )
+                }
+            }
+        }
     }
 
     private func subtitle(for closet: Closet) -> String {
@@ -308,17 +361,16 @@ struct ClosetsListView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             Text("No Closets yet")
                 .font(Theme.Font.headline(22))
                 .foregroundStyle(Theme.Color.primaryText)
-            Button("Create a Closet") { showingCreate = true }
-                .font(Theme.Font.body(16, weight: .medium))
-                .foregroundStyle(Theme.Color.accent)
-            Button("Have an invite link? Paste it") { showingJoin = true }
-                .font(Theme.Font.body(16))
-                .foregroundStyle(Theme.Color.accent)
+            Text("Create one for your group, or join a friend's with their code.")
+                .font(Theme.Font.body(14))
+                .foregroundStyle(Theme.Color.secondaryText)
+                .multilineTextAlignment(.center)
         }
+        .padding(.horizontal, 40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
