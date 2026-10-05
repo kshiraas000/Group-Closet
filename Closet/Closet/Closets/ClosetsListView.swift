@@ -89,13 +89,19 @@ struct ClosetsListView: View {
                 path.removeAll()
             }
             .sheet(isPresented: $showingCreate) {
-                CreateClosetView {
-                    Task { await viewModel.loadClosets() }
+                CreateClosetView { closetID in
+                    Task {
+                        await viewModel.loadClosets()
+                        path = [closetID]
+                    }
                 }
             }
             .sheet(isPresented: $showingJoin) {
-                JoinClosetView {
-                    Task { await viewModel.loadClosets() }
+                JoinClosetView { closetID in
+                    Task {
+                        await viewModel.loadClosets()
+                        path = [closetID]
+                    }
                 }
             }
             .confirmationDialog(
@@ -195,15 +201,10 @@ struct ClosetsListView: View {
             }
 
             if !viewModel.isLoading, !viewModel.closets.isEmpty {
-                HStack(spacing: 8) {
-                    Text("YOUR CLOSETS")
-                        .foregroundStyle(Theme.Color.secondaryText)
-                    Text("\(viewModel.closets.count)")
-                        .foregroundStyle(Theme.Color.tertiaryText)
-                }
-                .font(Theme.Font.body(12, weight: .medium))
-                .tracking(0.4)
-                .padding(.top, 10)
+                Text("Your Closets · \(viewModel.closets.count)")
+                    .font(Theme.Font.body(13, weight: .medium))
+                    .foregroundStyle(Theme.Color.secondaryText)
+                    .padding(.top, 8)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -240,7 +241,7 @@ struct ClosetsListView: View {
         List {
             ForEach(sortedClosets) { closet in
                 closetRow(closet)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 3, leading: 20, bottom: 3, trailing: 20))
                     .listRowSeparator(.hidden)
                     .listRowBackground(Theme.Color.background)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -303,19 +304,16 @@ struct ClosetsListView: View {
                 path = [closet.id]
             } label: {
                 HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(closet.name)
-                            .font(Theme.Font.headline(19))
+                            .font(Theme.Font.headline(18))
                             .foregroundStyle(Theme.Color.primaryText)
                             .lineLimit(1)
 
-                        HStack(spacing: 7) {
-                            memberAvatars(for: closet)
-                            Text(subtitle(for: closet))
-                                .font(Theme.Font.body(12.5))
-                                .foregroundStyle(Theme.Color.tertiaryText)
-                                .lineLimit(1)
-                        }
+                        Text(subtitle(for: closet))
+                            .font(Theme.Font.body(12.5))
+                            .foregroundStyle(Theme.Color.tertiaryText)
+                            .lineLimit(1)
                     }
 
                     Spacer(minLength: 0)
@@ -330,26 +328,12 @@ struct ClosetsListView: View {
         }
         .padding(.leading, 6)
         .padding(.trailing, 16)
-        .padding(.vertical, 12)
-        .background(Theme.Color.cardBackground)
+        .padding(.vertical, 9)
+        // Favorites read subtly warmer and a touch lifted, without changing
+        // shape or becoming a visibly different kind of row.
+        .background(isFavorite ? Theme.Color.accent.opacity(0.07) : Theme.Color.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    @ViewBuilder
-    private func memberAvatars(for closet: Closet) -> some View {
-        let members = viewModel.members[closet.id] ?? []
-        if !members.isEmpty {
-            HStack(spacing: -5) {
-                ForEach(members.prefix(3)) { member in
-                    OwnerBadge(
-                        profile: member,
-                        signedURL: viewModel.memberPhotoURLs[member.id],
-                        diameter: 18,
-                        ringColor: Theme.Color.cardBackground
-                    )
-                }
-            }
-        }
+        .shadow(color: isFavorite ? Theme.Color.accent.opacity(0.12) : .clear, radius: isFavorite ? 5 : 0, y: isFavorite ? 2 : 0)
     }
 
     private func subtitle(for closet: Closet) -> String {

@@ -10,29 +10,13 @@ private struct ClosetIDRow: Decodable {
     }
 }
 
-private struct MemberRow: Decodable {
-    let closetID: UUID
-    let users: UserProfile
-
-    enum CodingKeys: String, CodingKey {
-        case closetID = "closet_id"
-        case users
-    }
-}
-
 @Observable
 final class ClosetsViewModel {
     var closets: [Closet] = []
-    /// Each closet's members, for the row avatars and member count.
-    var members: [UUID: [UserProfile]] = [:]
-    var memberPhotoURLs: [UUID: URL] = [:]
+    var memberCounts: [UUID: Int] = [:]
     var pieceCounts: [UUID: Int] = [:]
     var isLoading = true
     var errorMessage: String?
-
-    var memberCounts: [UUID: Int] {
-        members.mapValues(\.count)
-    }
 
     private let client = SupabaseService.shared
 
@@ -54,11 +38,6 @@ final class ClosetsViewModel {
 
         await loadCounts()
         isLoading = false
-
-        // Signed after the list is showing, not before: avatars fall back to
-        // initials until these land, so the list never waits on them.
-        let everyone = Dictionary(members.values.joined().map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        memberPhotoURLs = await ProfilePhotoResolver.signedURLs(for: Array(everyone.values))
     }
 
     // These report failure by return value rather than errorMessage: on the
@@ -97,16 +76,14 @@ final class ClosetsViewModel {
     /// the subtitle off rather than blanking the whole list — the names are
     /// the load-bearing content.
     private func loadCounts() async {
-        // users!inner for the same reason as items!inner below: a member
-        // whose profile RLS hides would otherwise come back as null and fail
-        // the whole decode.
-        if let rows: [MemberRow] = try? await client
+        if let rows: [ClosetIDRow] = try? await client
             .from("closet_members")
-            .select("closet_id, users!inner(id, name, photo_url, sizes)")
-            .order("joined_at")
+            .select("closet_id")
             .execute()
             .value {
-            members = Dictionary(grouping: rows, by: \.closetID).mapValues { $0.map(\.users) }
+            memberCounts = rows.reduce(into: [:]) { counts, row in
+                counts[row.closetID, default: 0] += 1
+            }
         }
 
         // items!inner, never a plain items embed: a to-one embed is a LEFT

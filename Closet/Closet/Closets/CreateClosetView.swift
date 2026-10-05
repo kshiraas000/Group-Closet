@@ -1,77 +1,82 @@
 import SwiftUI
 
+/// A compact bottom sheet, not a full-screen Form — the whole flow is one
+/// field. Sizes itself to its content via reportSheetHeight rather than a
+/// fixed or .medium detent.
 struct CreateClosetView: View {
     @State private var viewModel = CreateClosetViewModel()
-    @State private var createdCloset: Closet?
+    @FocusState private var isNameFocused: Bool
+    @State private var sheetHeight: CGFloat = 1
     @Environment(\.dismiss) private var dismiss
-    let onCreated: () -> Void
+    let onCreated: (UUID) -> Void
+
+    private var trimmedName: String {
+        viewModel.name.trimmingCharacters(in: .whitespaces)
+    }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let createdCloset {
-                    inviteView(for: createdCloset)
-                } else {
-                    form
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Theme.Color.background)
-            .navigationTitle(createdCloset == nil ? "New Closet" : "Invite Friends")
-            .toolbar {
-                if createdCloset == nil {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(viewModel.isSaving ? "Creating..." : "Create") {
-                            Task {
-                                if let closet = await viewModel.create() {
-                                    onCreated()
-                                    createdCloset = closet
-                                }
-                            }
-                        }
-                        .disabled(viewModel.isSaving)
-                        .tint(Theme.Color.accent)
-                    }
-                }
-            }
-        }
-    }
-
-    private var form: some View {
-        Form {
-            Section {
-                TextField("Closet name", text: $viewModel.name)
-                    .font(Theme.Font.body(16))
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(Theme.Font.body(14))
-                        .foregroundStyle(.red)
-                }
-            }
-            .listRowBackground(Theme.Color.background)
-        }
-        .scrollContentBackground(.hidden)
-        .background(Theme.Color.background)
-    }
-
-    private func inviteView(for closet: Closet) -> some View {
-        VStack(spacing: 16) {
-            Text("\(closet.name) is ready")
-                .font(Theme.Font.headline(22))
+        VStack(alignment: .leading, spacing: 16) {
+            Text("New Closet")
+                .font(Theme.Font.headline(20))
                 .foregroundStyle(Theme.Color.primaryText)
-            Text("Invite code: \(ClosetInvite.formatted(closet.inviteCode))")
-                .font(Theme.Font.body(18, weight: .medium))
-                .foregroundStyle(Theme.Color.secondaryText)
-            ShareLink(item: ClosetInvite.shareMessage(closetName: closet.name, inviteCode: closet.inviteCode))
-                .font(Theme.Font.body(16, weight: .medium))
-                .foregroundStyle(Theme.Color.accent)
-            Button("Done") { dismiss() }
-                .font(Theme.Font.body(16, weight: .medium))
-                .foregroundStyle(Theme.Color.accent)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            // Just the name field for now — room here for an optional group
+            // picture (photo, initials, or emoji) beside it later.
+            TextField("Closet name", text: $viewModel.name)
+                .font(Theme.Font.body(17))
+                .foregroundStyle(Theme.Color.primaryText)
+                .focused($isNameFocused)
+                .submitLabel(.done)
+                .onSubmit(create)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 13)
+                .background(Theme.Color.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .font(Theme.Font.body(13))
+                    .foregroundStyle(.red)
+            }
+
+            HStack(spacing: 12) {
+                Button("Cancel") { dismiss() }
+                    .font(Theme.Font.body(16))
+                    .foregroundStyle(Theme.Color.secondaryText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(Theme.Color.primaryText.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                Button(action: create) {
+                    Text(viewModel.isSaving ? "Creating..." : "Create")
+                        .font(Theme.Font.body(16, weight: .medium))
+                        .foregroundStyle(Theme.Color.background)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                }
+                .background(trimmedName.isEmpty ? Theme.Color.accent.opacity(0.4) : Theme.Color.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .disabled(trimmedName.isEmpty || viewModel.isSaving)
+            }
         }
-        .padding()
+        .padding(20)
+        .padding(.bottom, 4)
+        .background(Theme.Color.background)
+        .reportSheetHeight(to: $sheetHeight)
+        .presentationDetents([.height(max(sheetHeight, 1))])
+        .presentationDragIndicator(.visible)
+        .onAppear { isNameFocused = true }
+    }
+
+    private func create() {
+        guard !trimmedName.isEmpty, !viewModel.isSaving else { return }
+        Task {
+            if let closet = await viewModel.create() {
+                dismiss()
+                onCreated(closet.id)
+            }
+        }
     }
 }
