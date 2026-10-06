@@ -7,7 +7,11 @@ private struct ItemDetailContext: Identifiable {
 }
 
 struct ClosetDetailView: View {
-    @State private var viewModel = ClosetDetailViewModel()
+    // Owned by ClosetNavigationStore (one per closet, cached there), not
+    // @State here: switching tabs rebuilds this view from scratch, and an
+    // externally-owned view model is what lets items, filters and loading
+    // state survive that.
+    @Bindable var viewModel: ClosetDetailViewModel
     @State private var showingLeaveConfirmation = false
     @State private var showingDeleteConfirmation = false
     @State private var showingAddItem = false
@@ -26,27 +30,7 @@ struct ClosetDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let closet: Closet
     let userID: UUID
-    let onFiltersChanged: (BrowseFilters) -> Void
     let onLeft: () -> Void
-
-    /// `initialFilters` seeds the view model up front (not in .task) so a
-    /// restored filter is already applied on the first frame, with no flash
-    /// of the unfiltered grid.
-    init(
-        closet: Closet,
-        userID: UUID,
-        initialFilters: BrowseFilters,
-        onFiltersChanged: @escaping (BrowseFilters) -> Void,
-        onLeft: @escaping () -> Void
-    ) {
-        self.closet = closet
-        self.userID = userID
-        self.onFiltersChanged = onFiltersChanged
-        self.onLeft = onLeft
-        let viewModel = ClosetDetailViewModel()
-        viewModel.filters = initialFilters
-        _viewModel = State(initialValue: viewModel)
-    }
 
     /// Mirrors the DELETE policy on public.closets: the creator, or any member
     /// once the creator has deleted their account and created_by went null.
@@ -225,9 +209,6 @@ struct ClosetDetailView: View {
         .sensoryFeedback(.selection, trigger: selection.selectedIDs)
         .onChange(of: viewModel.filteredItems.map(\.id)) { _, visible in
             selection.retain(Set(visible))
-        }
-        .onChange(of: viewModel.filters) { _, filters in
-            onFiltersChanged(filters)
         }
         .confirmationDialog(
             "Leave \(closet.name)?",

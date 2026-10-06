@@ -69,7 +69,13 @@ final class ClosetDetailViewModel {
     }
 
     func load(closetID: UUID) async {
-        isLoading = true
+        // Only the very first load (no items yet) blocks the UI with a
+        // spinner. This view model now persists per closet across tab
+        // switches, so a reload on returning should refresh silently behind
+        // whatever's already showing, not flash the whole screen blank.
+        if items.isEmpty {
+            isLoading = true
+        }
         defer { isLoading = false }
         var failures: [String] = []
 

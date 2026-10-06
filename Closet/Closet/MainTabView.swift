@@ -8,11 +8,15 @@ struct MainTabView: View {
     // content from scratch, so the "which closet am I in" state has to be
     // owned by something that outlives it.
     @State private var closetNavigation: ClosetNavigationStore
-    /// Same reason as closetNavigation: My Clothes is rebuilt on every tab
-    /// switch, so its items, filters and loading state live here instead —
-    /// otherwise returning to the tab flashed a spinner and refetched from
-    /// scratch every time. Resets on sign-out with this view.
+    /// Same reason as closetNavigation: every tab's content is rebuilt from
+    /// scratch on each switch, so each tab's own view model has to live here
+    /// instead to survive that — otherwise returning to a tab flashed a
+    /// spinner and refetched from scratch every time. Resets on sign-out
+    /// with this view. (A given closet's own view model is cached inside
+    /// closetNavigation instead, since there can be many closets.)
+    @State private var closetsViewModel = ClosetsViewModel()
     @State private var myClothesViewModel = MyClothesViewModel()
+    @State private var profileViewModel = ProfileViewModel()
 
     init(userID: UUID, onSignedOut: @escaping () async -> Void) {
         self.userID = userID
@@ -29,13 +33,13 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .closets:
-                    ClosetsListView(navigation: closetNavigation, userID: userID)
+                    ClosetsListView(navigation: closetNavigation, viewModel: closetsViewModel, userID: userID)
                 case .myClothes:
                     MyClothesView(viewModel: myClothesViewModel, userID: userID)
                 case .profile:
                     // Covers account deletion too — ProfileView routes both
                     // through onSignedOut.
-                    ProfileView(userID: userID, onSignedOut: {
+                    ProfileView(viewModel: profileViewModel, userID: userID, onSignedOut: {
                         closetNavigation.clear()
                         await onSignedOut()
                     })

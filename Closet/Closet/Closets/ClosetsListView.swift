@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct ClosetsListView: View {
-    @State private var viewModel = ClosetsViewModel()
+    // Owned by MainTabView, not @State here — see MainTabView.closetsViewModel.
+    @Bindable var viewModel: ClosetsViewModel
     @State private var showingCreate = false
     @State private var showingJoin = false
     @State private var pendingRemoval: Closet?
@@ -10,8 +11,9 @@ struct ClosetsListView: View {
     let navigation: ClosetNavigationStore
     let userID: UUID
 
-    init(navigation: ClosetNavigationStore, userID: UUID) {
+    init(navigation: ClosetNavigationStore, viewModel: ClosetsViewModel, userID: UUID) {
         self.navigation = navigation
+        self.viewModel = viewModel
         self.userID = userID
         // Seeded synchronously: the stack is already inside the closet on its
         // very first render, so no Closets list and no push animation is ever
@@ -55,10 +57,9 @@ struct ClosetsListView: View {
                 if let closet = viewModel.closets.first(where: { $0.id == closetID })
                     ?? navigation.cachedCloset(id: closetID) {
                     ClosetDetailView(
+                        viewModel: navigation.detailViewModel(for: closet.id),
                         closet: closet,
-                        userID: userID,
-                        initialFilters: navigation.filters(for: closet.id),
-                        onFiltersChanged: { navigation.setFilters($0, for: closet.id) }
+                        userID: userID
                     ) {
                         navigation.forget(closet.id)
                         Task { await viewModel.loadClosets() }

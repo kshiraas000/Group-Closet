@@ -27,7 +27,13 @@ final class ProfileViewModel {
     private let client = SupabaseService.shared
 
     func load(userID: UUID) async {
-        isLoading = true
+        // Only the very first load (profile not yet loaded) blocks the UI
+        // with a spinner. This view model now persists across tab switches,
+        // so a reload on returning to the tab should refresh silently behind
+        // whatever's already showing.
+        if !hasLoadedProfile {
+            isLoading = true
+        }
         defer { isLoading = false }
         var failures: [String] = []
 

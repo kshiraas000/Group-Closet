@@ -54,17 +54,22 @@ final class ClosetNavigationStore {
         popToRootRequests += 1
     }
 
-    /// Session-only: each closet's filters and search, so switching tabs (which
-    /// rebuilds the closet screen) doesn't reset them. Not observed — it's
-    /// written on every search keystroke, and nothing needs to redraw for it.
-    @ObservationIgnored private var filtersByCloset: [UUID: BrowseFilters] = [:]
+    /// Session-only: one ClosetDetailViewModel per closet, created the first
+    /// time it's opened and kept after that. Switching tabs rebuilds
+    /// ClosetDetailView from scratch, same as the rest of this store's
+    /// state — without this, returning to an open closet re-fetched
+    /// everything and flashed a loading spinner. This also carries each
+    /// closet's filters and search for free, since those live on the view
+    /// model too.
+    private var detailViewModels: [UUID: ClosetDetailViewModel] = [:]
 
-    func filters(for closetID: UUID) -> BrowseFilters {
-        filtersByCloset[closetID] ?? BrowseFilters()
-    }
-
-    func setFilters(_ filters: BrowseFilters, for closetID: UUID) {
-        filtersByCloset[closetID] = filters
+    func detailViewModel(for closetID: UUID) -> ClosetDetailViewModel {
+        if let existing = detailViewModels[closetID] {
+            return existing
+        }
+        let created = ClosetDetailViewModel()
+        detailViewModels[closetID] = created
+        return created
     }
 
     /// Last known closets, so a restored navigation stack can render its
@@ -102,7 +107,7 @@ final class ClosetNavigationStore {
         openClosetID = nil
         recentOrder = []
         cachedClosets = []
-        filtersByCloset = [:]
+        detailViewModels = [:]
         didAutoOpen = false
 
         let defaults = UserDefaults.standard
@@ -154,7 +159,7 @@ final class ClosetNavigationStore {
         if openClosetID == closetID { openClosetID = nil }
         if favoriteClosetID == closetID { favoriteClosetID = nil }
         recentOrder.removeAll { $0 == closetID }
-        filtersByCloset[closetID] = nil
+        detailViewModels[closetID] = nil
         // Written directly, not via cacheClosets(): that refuses an empty list,
         // and leaving your last closet must still drop it — otherwise the next
         // launch's initialPath() reopens a closet that no longer exists.

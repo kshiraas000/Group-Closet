@@ -22,7 +22,13 @@ final class ClosetsViewModel {
 
     func loadClosets() async {
         errorMessage = nil
-        isLoading = true
+        // Only the very first load (no closets yet) blocks the UI with a
+        // spinner. This view model now persists across tab switches, so a
+        // reload on returning to the tab should refresh silently behind
+        // whatever's already showing.
+        if closets.isEmpty {
+            isLoading = true
+        }
         do {
             closets = try await client
                 .from("closets")

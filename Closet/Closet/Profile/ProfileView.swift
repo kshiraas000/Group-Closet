@@ -2,7 +2,8 @@ import PhotosUI
 import SwiftUI
 
 struct ProfileView: View {
-    @State private var viewModel = ProfileViewModel()
+    // Owned by MainTabView, not @State here — see MainTabView.profileViewModel.
+    @Bindable var viewModel: ProfileViewModel
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var pendingCropImage: UIImage?
     @State private var showingDeleteConfirmation = false
