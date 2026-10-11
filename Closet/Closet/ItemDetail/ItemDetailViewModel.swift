@@ -93,6 +93,57 @@ final class ItemDetailViewModel {
         await loadShareState(itemID: itemID)
     }
 
+    func deleteItem(_ item: BrowseItem) async -> Bool {
+        do {
+            // Delete the row first: if this fails, nothing changed. If we
+            // deleted the storage object first and the row delete then
+            // failed, the item would survive with a dangling photo_url —
+            // rendering as a permanent blank tile with no way to fix it.
+            try await client.from("items").delete().eq("id", value: item.id).execute()
+            if let path = item.photoPath {
+                try? await client.storage.from("item-photos").remove(paths: [path])
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func updateItem(
+        itemID: UUID,
+        category: ItemCategory,
+        size: String,
+        color: String,
+        occasionTags: [String],
+        caption: String
+    ) async -> Bool {
+        struct ItemUpdate: Encodable {
+            let category: ItemCategory
+            let size: String?
+            let color: String?
+            let occasionTags: [String]
+            let caption: String?
+            enum CodingKeys: String, CodingKey {
+                case category, size, color
+                case occasionTags = "occasion_tags"
+                case caption
+            }
+        }
+        do {
+            let update = ItemUpdate(
+                category: category,
+                size: size.isEmpty ? nil : size,
+                color: color.isEmpty ? nil : color,
+                occasionTags: occasionTags,
+                caption: caption.isEmpty ? nil : caption
+            )
+            try await client.from("items").update(update).eq("id", value: itemID).execute()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     func report(itemID: UUID, reporterID: UUID) async -> Bool {
         do {
             struct NewReport: Encodable {

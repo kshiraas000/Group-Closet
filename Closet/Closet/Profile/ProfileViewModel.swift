@@ -27,7 +27,13 @@ final class ProfileViewModel {
     private let client = SupabaseService.shared
 
     func load(userID: UUID) async {
-        isLoading = true
+        // Only the very first load (profile not yet loaded) blocks the UI
+        // with a spinner. This view model now persists across tab switches,
+        // so a reload on returning to the tab should refresh silently behind
+        // whatever's already showing.
+        if !hasLoadedProfile {
+            isLoading = true
+        }
         defer { isLoading = false }
         var failures: [String] = []
 
@@ -181,13 +187,50 @@ final class ProfileViewModel {
         errorMessage = "Could not load that photo"
     }
 
-    func deleteAccount() async -> Bool {
+    func deleteAccount(userID: UUID) async -> Bool {
         do {
+            try await removeStoredPhotos(userID: userID)
             try await client.rpc("delete_own_account").execute()
             return true
         } catch {
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    /// Photos have to go before the account does: the rows in storage.objects
+    /// are only metadata, so dropping them in SQL would unlink the files while
+    /// leaving the bytes in the bucket. Only the Storage API deletes for real,
+    /// and once the auth user is gone the paths are no longer readable.
+    private func removeStoredPhotos(userID: UUID) async throws {
+        struct ItemRow: Decodable { let id: UUID }
+        struct PhotoRow: Decodable {
+            let photoURL: String
+            enum CodingKeys: String, CodingKey { case photoURL = "photo_url" }
+        }
+
+        let items: [ItemRow] = try await client
+            .from("items")
+            .select("id")
+            .eq("owner_id", value: userID)
+            .execute()
+            .value
+
+        if !items.isEmpty {
+            let photos: [PhotoRow] = try await client
+                .from("item_photos")
+                .select("photo_url")
+                .in("item_id", values: items.map(\.id))
+                .execute()
+                .value
+            let paths = photos.map(\.photoURL)
+            if !paths.isEmpty {
+                _ = try await client.storage.from("item-photos").remove(paths: paths)
+            }
+        }
+
+        if let photoPath {
+            _ = try await client.storage.from("profile-photos").remove(paths: [photoPath])
         }
     }
 }

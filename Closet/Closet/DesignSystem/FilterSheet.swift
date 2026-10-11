@@ -25,6 +25,22 @@ struct FilterSheet: View {
                     .listRowBackground(Theme.Color.background)
                 }
 
+                Section("Category") {
+                    radioRow(title: "Any", isSelected: filters.categories.isEmpty) {
+                        filters.categories = []
+                    }
+                    ForEach(ItemCategory.allCases) { category in
+                        radioRow(title: category.pluralLabel, isSelected: filters.categories.contains(category)) {
+                            if filters.categories.contains(category) {
+                                filters.categories.remove(category)
+                            } else {
+                                filters.categories.insert(category)
+                            }
+                        }
+                    }
+                }
+                .listRowBackground(Theme.Color.background)
+
                 if !availableSizes.isEmpty {
                     Section("Size") {
                         radioRow(title: "Any", isSelected: filters.size == nil) {

@@ -69,7 +69,13 @@ final class ClosetDetailViewModel {
     }
 
     func load(closetID: UUID) async {
-        isLoading = true
+        // Only the very first load (no items yet) blocks the UI with a
+        // spinner. This view model now persists per closet across tab
+        // switches, so a reload on returning should refresh silently behind
+        // whatever's already showing, not flash the whole screen blank.
+        if items.isEmpty {
+            isLoading = true
+        }
         defer { isLoading = false }
         var failures: [String] = []
 
@@ -155,6 +161,23 @@ final class ClosetDetailViewModel {
                 .delete()
                 .eq("closet_id", value: closetID)
                 .eq("user_id", value: userID)
+                .execute()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Deletes the closet for everyone. RLS allows this only for the creator, or
+    /// for any member once the creator has deleted their account.
+    func deleteCloset(closetID: UUID) async -> Bool {
+        errorMessage = nil
+        do {
+            try await client
+                .from("closets")
+                .delete()
+                .eq("id", value: closetID)
                 .execute()
             return true
         } catch {

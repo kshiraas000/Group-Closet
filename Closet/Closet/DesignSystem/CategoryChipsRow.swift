@@ -1,18 +1,26 @@
 import SwiftUI
 
 struct CategoryChipsRow: View {
-    @Binding var selectedCategory: ItemCategory?
+    @Binding var selectedCategories: Set<ItemCategory>
     let onFilterTapped: () -> Void
+
+    private let curatedCategories: [ItemCategory] = [.top, .bottom, .dress]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                chip(title: "All", isSelected: selectedCategory == nil) {
-                    selectedCategory = nil
+                chip(title: "All", isSelected: selectedCategories.isEmpty) {
+                    selectedCategories = []
                 }
-                ForEach(ItemCategory.allCases) { category in
-                    chip(title: category.rawValue, isSelected: selectedCategory == category) {
-                        selectedCategory = category
+                ForEach(curatedCategories) { category in
+                    chip(title: category.pluralLabel, isSelected: selectedCategories.contains(category)) {
+                        // Toggle: tapping a selected chip clears it, and any
+                        // number of categories can be active at once.
+                        if selectedCategories.contains(category) {
+                            selectedCategories.remove(category)
+                        } else {
+                            selectedCategories.insert(category)
+                        }
                     }
                 }
                 Button(action: onFilterTapped) {
@@ -29,8 +37,6 @@ struct CategoryChipsRow: View {
                     .clipShape(Capsule())
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
         }
     }
 
